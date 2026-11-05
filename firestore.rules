@@ -1,0 +1,117 @@
+rules_version = '2';
+
+// Pe scurt:
+// - În aplicație intră doar adresele din colecția `allowed` (puse acolo la invitare) și adminii (`admins`).
+// - O listă o văd doar membrii ei. Orice membru poate invita; scoate oameni doar creatorul listei sau adminul.
+//   Oricine poate ieși singur dintr-o listă (în afară de creator, care o poate șterge).
+// - Adminul vede toate listele (nume, membri, număr de produse) și le poate șterge. Interfața nu îi arată
+//   conținutul listelor în care nu e membru, dar regulile îi permit să-l citească, ca să poată șterge tot.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(myEmail()));
+    }
+    function isAllowed() {
+      return signedIn()
+        && (exists(/databases/$(database)/documents/allowed/$(myEmail())) || isAdmin());
+    }
+    function isMember(list) {
+      return isAllowed() && myEmail() in list.memberEmails;
+    }
+    function isOwner(list) {
+      return signedIn() && list.ownerUid == request.auth.uid;
+    }
+
+    // Adminii se adaugă manual din consolă: colecția `admins`, ID-ul documentului = adresa de email.
+    match /admins/{email} {
+      allow read: if signedIn() && email == myEmail();
+    }
+
+    match /allowed/{email} {
+      allow read: if signedIn() && (email == myEmail() || isAdmin());
+      allow create, update: if isAllowed()
+        && request.resource.data.keys().hasOnly(['email', 'invitedByEmail', 'at'])
+        && request.resource.data.email == email
+        && request.resource.data.invitedByEmail == myEmail();
+      allow delete: if isAdmin();
+    }
+
+    match /lists/{listId} {
+      function list() {
+        return get(/databases/$(database)/documents/lists/$(listId)).data;
+      }
+      function canUse() {
+        return isMember(list()) || isAdmin();
+      }
+      function validList(l) {
+        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt'])
+          && l.name is string && l.name.size() > 0 && l.name.size() <= 60
+          && l.memberEmails is list && l.memberEmails.size() <= 30
+          && l.ownerEmail in l.memberEmails;
+      }
+      function membersOk(before, after) {
+        return after.memberEmails == before.memberEmails
+          || isOwner(before) || isAdmin()
+          || after.memberEmails.hasAll(before.memberEmails)                    // doar adăugări (invitații)
+          || after.memberEmails == before.memberEmails.removeAll([myEmail()]); // ieși singur din listă
+      }
+
+      allow read: if isMember(resource.data) || isAdmin();
+
+      allow create: if isAllowed()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail()
+        && validList(request.resource.data);
+
+      allow update: if (isMember(resource.data) || isAdmin())
+        && validList(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && membersOk(resource.data, request.resource.data);
+
+      allow delete: if isOwner(resource.data) || isAdmin();
+
+      // Catalogul de produse folosite (sugestii și raionul ținut minte).
+      match /products/{key} {
+        allow read, write: if isMember(list());
+        allow read, delete: if isAdmin();
+      }
+
+      match /items/{itemId} {
+        function validItem(i) {
+          return i.name is string && i.name.size() > 0 && i.name.size() <= 120
+            && i.status in ['pending', 'bought', 'skipped']
+            && i.archived is bool;
+        }
+
+        allow read, delete: if canUse();
+        allow create: if isMember(list())
+          && validItem(request.resource.data)
+          && request.resource.data.addedBy.uid == request.auth.uid;
+        allow update: if isMember(list())
+          && validItem(request.resource.data)
+          && request.resource.data.addedBy == resource.data.addedBy;
+
+        match /messages/{msgId} {
+          allow read, delete: if canUse();
+          allow create: if isMember(list())
+            && request.resource.data.keys().hasOnly(['text', 'photo', 'by', 'at', 'reactions'])
+            && request.resource.data.by.uid == request.auth.uid
+            && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+            && (request.resource.data.photo == null
+                || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
+          // Reacțiile: oricine din listă le poate modifica, dar nimic altceva din mesaj.
+          allow update: if isMember(list())
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+        }
+      }
+    }
+  }
+}

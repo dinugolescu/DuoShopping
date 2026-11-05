@@ -27,9 +27,14 @@ Deschide http://localhost:5173. Datele stau doar în browser. Două taburi cu ut
 
    La `AUTH_DOMAIN` pune `NUME-PROIECT.web.app`, nu `...firebaseapp.com` cum îți dă consola. Motivul e explicat la pasul 5.
 
+   **`NUME-PROIECT` înseamnă ID-ul proiectului, nu numele afișat.** ID-ul e mereu cu litere mici și uneori are un sufix adăugat de Firebase (ex. `duoshopping-4f2a1`). Îl găsești în ⚙️ (lângă „Project Overview”, sus în stânga) → **Project settings** → **General** → **Project ID**. Este și valoarea `projectId` din `firebaseConfig`.
+
 ## 2. Pornește login-ul cu Google
 
-**Build → Authentication → Get started → Sign-in method → Google → Enable.** Alege adresa de suport și salvează.
+1. În bara din stânga a consolei Firebase deschide **Authentication**. E de obicei în grupul **Build** (în versiunile mai noi ale consolei, poate fi în grupul **Security**). Dacă nu-l găsești, caută „Authentication” în bara de căutare de sus.
+2. Apasă **Get started** (doar prima dată).
+3. Tabul **Sign-in method** → în lista de furnizori alege **Google**.
+4. Activează comutatorul **Enable**, alege la „Project support email” adresa ta și apasă **Save**.
 
 `localhost`, `NUME-PROIECT.web.app` și `NUME-PROIECT.firebaseapp.com` sunt deja autorizate implicit (tabul Settings → Authorized domains).
 
@@ -40,6 +45,8 @@ Deschide http://localhost:5173. Datele stau doar în browser. Două taburi cu ut
 - Mod: **production**. Regulile de securitate vin din proiect, la pasul următor.
 
 ## 4. Instalează Firebase CLI și publică regulile
+
+> **Pe Windows, dacă apare „running scripts is disabled on this system”:** PowerShell blochează scripturile `.ps1` prin care pornesc `npm` și `firebase`. Folosește variantele `.cmd`, care nu sunt blocate: `npm.cmd` în loc de `npm` și `firebase.cmd` în loc de `firebase`. Dacă `firebase.cmd` nu e găsit imediat după instalare, deschide un terminal nou sau folosește calea completă: `& "$env:APPDATA\npm\firebase.cmd"`.
 
 ```bash
 npm install -g firebase-tools

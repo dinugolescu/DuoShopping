@@ -8,6 +8,7 @@ import { IconUp, IconChevron } from './icons.jsx'
 import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 import { AISLES, DEFAULT_AISLE, listAisles, guessAisle, normalize } from './aisles.js'
 import { reasonLabel } from './config.js'
+import { InviteShare, isInstalled } from './onboarding.jsx'
 
 const people = (n) => (n > 1 ? `${n} persoane` : 'doar tu')
 const products = (n = 0) => (n === 1 ? '1 produs' : `${n} produse`)
@@ -62,6 +63,8 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
       )}
 
       <div className="menu-links">
+        <button className="btn wide" onClick={() => onOpen('invite-app')}>Invită o familie nouă</button>
+        {!isInstalled() && <button className="btn wide" onClick={() => onOpen('install')}>Pune aplicația pe ecran</button>}
         <button className="btn wide" onClick={() => onOpen('settings')}>Setări și aspect</button>
         {admin && <button className="btn wide" onClick={() => onOpen('admin')}>Administrare</button>}
       </div>
@@ -85,6 +88,7 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
 export function ShareSheet({ list, user, admin, onClose }) {
   const toast = useToast()
   const [email, setEmail] = useState('')
+  const [invited, setInvited] = useState(null)
   const isOwner = list.ownerUid === user.uid
   const canRemove = isOwner || admin
 
@@ -95,7 +99,7 @@ export function ShareSheet({ list, user, admin, onClose }) {
     if (list.memberEmails.includes(v)) { toast('Persoana are deja acces'); return }
     api.invite(list, user, v)
     setEmail('')
-    toast(`${v} poate vedea acum lista`)
+    setInvited(v)
   }
 
   function kick(m) {
@@ -107,14 +111,6 @@ export function ShareSheet({ list, user, admin, onClose }) {
     if (!window.confirm(`Ieși din lista „${list.name}”? Nu o mai vezi până nu te invită cineva din nou.`)) return
     api.leaveList(list.id, user)
     onClose()
-  }
-
-  async function shareLink() {
-    const url = window.location.origin
-    try {
-      if (navigator.share) await navigator.share({ title: 'DuoShopping', text: 'Intră cu contul Google ca să vezi lista noastră.', url })
-      else { await navigator.clipboard.writeText(url); toast('Link copiat') }
-    } catch { /* utilizatorul a renunțat */ }
   }
 
   return (
@@ -141,7 +137,7 @@ export function ShareSheet({ list, user, admin, onClose }) {
         Persoana intră în aplicație cu contul Google de pe adresa asta și vede lista automat.
         {!canRemove && ' Doar cine a creat lista poate scoate oameni.'}
       </p>
-      <button className="btn wide" onClick={shareLink}>Trimite linkul aplicației</button>
+      {invited && <InviteShare user={user} email={invited} listName={list.name} />}
       {!isOwner && list.memberEmails.includes(user.email) && (
         <button className="btn danger wide" onClick={leave}>Ieși din listă</button>
       )}

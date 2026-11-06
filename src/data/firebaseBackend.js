@@ -115,8 +115,10 @@ async function deleteRefs(refs) {
 // ---------- Liste ----------
 
 export function watchLists(user, cb, onError) {
+  // Al doilea argument spune dacă răspunsul vine doar din cache (încă neconfirmat de server).
   const q = query(listsCol, where('memberEmails', 'array-contains', user.email))
-  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
+  return onSnapshot(q, { includeMetadataChanges: true },
+    (snap) => cb(snap.docs.map(fromDoc), { fromCache: snap.metadata.fromCache }), (e) => onError?.(e))
 }
 
 export function createList(user, name) {
@@ -159,6 +161,12 @@ export function invite(list, user, email) {
   b.update(listDoc(list.id), { memberEmails: arrayUnion(e) })
   b.set(doc(db, 'allowed', e), { email: e, invitedByEmail: user.email, at: serverTimestamp() })
   fire(b.commit())
+}
+
+// Acces în aplicație fără nicio listă comună: persoana își face apoi listele ei.
+export function inviteToApp(user, email) {
+  const e = normEmail(email)
+  fire(setDoc(doc(db, 'allowed', e), { email: e, invitedByEmail: user.email, at: serverTimestamp() }))
 }
 
 export function removeMember(listId, email) {

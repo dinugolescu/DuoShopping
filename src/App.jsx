@@ -6,6 +6,7 @@ import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, Aisles
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
+import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips } from './onboarding.jsx'
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ function Login() {
         </button>
       )}
       {err && <p className="error">{err}</p>}
+      <InAppWarning />
     </main>
   )
 }
@@ -91,6 +93,7 @@ function NoAccess({ user }) {
 }
 
 const ORDER_KEY = 'ordine-liste'
+const FIRST_LIST = 'Cumpărături'
 
 function Home({ user, admin }) {
   const toast = useToast()
@@ -99,7 +102,15 @@ function Home({ user, admin }) {
   const [currentId, setCurrentId] = useState(() => store.get('lista-curenta'))
   const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
 
-  useEffect(() => api.watchLists(user, setLists, (e) => toast(errText(e))), [user.uid, user.email, toast])
+  useEffect(() => api.watchLists(user, (ls, meta) => {
+    setLists(ls)
+    // Prima intrare: cine n-are nicio listă primește una gata făcută. O singură dată per cont,
+    // și doar după ce serverul confirmă (din cache, la început, lista poate părea goală).
+    const key = `prima-lista-${user.uid}`
+    if (meta?.fromCache || store.get(key)) return
+    store.set(key, true)
+    if (ls.length === 0) setCurrentId(api.createList(user, FIRST_LIST))
+  }, (e) => toast(errText(e))), [user.uid, user.email, toast])
 
   // Ordinea listelor e personală: întâi cele ordonate de tine, apoi restul în ordinea creării.
   const sorted = lists && [...lists].sort((a, b) => {
@@ -144,6 +155,8 @@ function Home({ user, admin }) {
         )}
       </header>
 
+      <InstallBanner onOpen={() => setSheet('install')} />
+      {current && <Tips />}
       {current
         ? <ListView key={current.id} list={current} user={user} />
         : <EmptyLists user={user} onCreate={create} onMenu={() => setSheet('menu')} />}
@@ -163,13 +176,15 @@ function Home({ user, admin }) {
       {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} onClose={close} />}
       {sheet === 'admin' && admin && <AdminSheet user={user} onClose={close} />}
       {sheet === 'aisles' && current && <AislesSheet list={current} onClose={close} />}
+      {sheet === 'invite-app' && <InviteAppSheet user={user} onClose={close} />}
+      {sheet === 'install' && <InstallSheet onClose={close} />}
       {sheet === 'history' && current && <HistorySheet list={current} user={user} onClose={close} />}
     </div>
   )
 }
 
 function EmptyLists({ user, onCreate, onMenu }) {
-  const [name, setName] = useState('Casă')
+  const [name, setName] = useState(FIRST_LIST)
   return (
     <main className="empty">
       <h2>Nicio listă încă</h2>

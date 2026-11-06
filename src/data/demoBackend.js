@@ -118,6 +118,11 @@ export function invite(list, user, email) {
   })
 }
 
+export function inviteToApp(user, email) {
+  const e = normEmail(email)
+  mutate((db) => { db.allowed[e] = { email: e, invitedByEmail: user.email, at: Date.now() } })
+}
+
 export function removeMember(listId, email) {
   const e = normEmail(email)
   mutate((db) => {

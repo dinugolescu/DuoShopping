@@ -454,3 +454,22 @@ div.center { padding: 48px 16px; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; padding: 10px 12px;
   border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent);
 }
+
+/* Invitații, instalare, sfaturi */
+.invite-done { margin-top: 14px; }
+.invite-done p { margin: 0 0 4px; }
+.announce-preview.small { font-size: 14px; }
+.steps { margin: 10px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.4; }
+.warn-box {
+  margin-top: 24px; padding: 12px 14px; border-radius: 12px; text-align: left;
+  background: var(--skip-soft); color: var(--text); border: 1px solid var(--skip);
+}
+.hint-bar {
+  display: flex; align-items: center; gap: 8px; margin: 10px 16px 0; padding: 6px 6px 6px 12px;
+  border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent);
+}
+.hint-main { background: none; border: 0; padding: 6px 0; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+.tips { margin: 10px 16px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.tips h3 { margin: 0 0 6px; font-size: 16px; }
+.tips ul { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.tips li { display: flex; gap: 8px; }

@@ -6,17 +6,33 @@
 const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 export const speechSupported = () => !!SR
 
-export function listen({ onText, onError, onEnd }) {
+const SILENCE_MS = 1800 // după atâta liniște considerăm că omul a terminat de spus
+const NOTHING_MS = 7000 // dacă nu vine nimic în atât timp, recunoașterea nu merge (se întâmplă pe iPhone)
+
+// Textul apare pe măsură ce vorbești (onPartial); la final primim tot ce s-a spus (onFinal).
+export function listen({ onPartial, onFinal, onError, onEnd }) {
   const r = new SR()
   r.lang = 'ro-RO'
-  r.interimResults = false
-  r.continuous = false
+  r.interimResults = true
+  r.continuous = true
   r.maxAlternatives = 1
-  r.onresult = (e) => onText(Array.from(e.results).map((x) => x[0].transcript).join(' '))
+  let text = ''
+  let silence
+  const watchdog = setTimeout(() => { if (!text) { r.abort(); onError('no-result') } }, NOTHING_MS)
+  r.onresult = (e) => {
+    text = Array.from(e.results).map((x) => x[0].transcript).join(' ').replace(/\s+/g, ' ').trim()
+    onPartial(text)
+    clearTimeout(silence)
+    silence = setTimeout(() => r.stop(), SILENCE_MS)
+  }
   r.onerror = (e) => onError(e.error)
-  r.onend = onEnd
+  r.onend = () => {
+    clearTimeout(watchdog); clearTimeout(silence)
+    if (text) onFinal(text)
+    onEnd()
+  }
   r.start()
-  return () => r.abort()
+  return () => r.stop()
 }
 
 export function speechErrText(code) {
@@ -26,6 +42,9 @@ export function speechErrText(code) {
   if (code === 'no-speech') return 'N-am auzit nimic. Mai încearcă.'
   if (code === 'network') return 'Recunoașterea vorbirii are nevoie de internet.'
   if (code === 'aborted') return null
+  if (code === 'no-result') {
+    return 'Microfonul aplicației nu aude pe acest telefon. Folosește microfonul de pe tastatură și spune „și” sau „virgulă” între produse; aplicația le împarte singură.'
+  }
   return 'Nu am putut asculta. Mai încearcă sau scrie produsele.'
 }
 

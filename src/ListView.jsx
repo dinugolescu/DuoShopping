@@ -11,6 +11,7 @@ import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic } from './ic
 import { speechSupported, listen, speechErrText, parseProducts } from './voice.js'
 
 const SEEN_KEY = 'mesaje-vazute'
+const KEYBOARD_VOICE_KEY = 'voce-prin-tastatura'
 const itemAisle = (i, aisles) => aisleIn(aisles, i.aisle || guessAisle(i.name, aisles))
 
 export function ListView({ list, user }) {
@@ -163,10 +164,21 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
 
   function voice() {
     if (listening) { stop.current?.(); return }
+    // Unde microfonul aplicației nu a mers, folosim direct dictarea de pe tastatură.
+    if (store.get(KEYBOARD_VOICE_KEY)) {
+      ref.current?.focus()
+      toast('Apasă microfonul de pe tastatură și spune produsele cu „și” sau „virgulă” între ele.')
+      return
+    }
     setListening(true)
     stop.current = listen({
-      onText: (text) => onAddMany(parseProducts(text, { spoken: true })),
-      onError: (code) => { const t = speechErrText(code); if (t) toast(t) },
+      onPartial: (text) => setName(text),
+      onFinal: (text) => { setName(''); onAddMany(parseProducts(text, { spoken: true })) },
+      onError: (code) => {
+        if (code === 'no-result') { store.set(KEYBOARD_VOICE_KEY, true); ref.current?.focus() }
+        const t = speechErrText(code)
+        if (t) toast(t)
+      },
       onEnd: () => { setListening(false); stop.current = null },
     })
   }
@@ -187,7 +199,9 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     e.preventDefault()
     if (!name.trim()) return
     // Cu virgule și fără cantitate separată: sunt mai multe produse („lapte, ouă, două pâini”).
-    const many = !qty.trim() && /[,;]/.test(name) ? parseProducts(name) : null
+    // Unde vocea merge prin tastatură, despărțim și după „și” (dictarea pune rar virgule).
+    const spoken = !!store.get(KEYBOARD_VOICE_KEY)
+    const many = !qty.trim() && (/[,;]/.test(name) || (spoken && /\s(și|si)\s/i.test(name))) ? parseProducts(name, { spoken }) : null
     if (many && many.length > 1 ? onAddMany(many) : onAdd({ name, quantity: qty })) { setName(''); setQty('') }
     ref.current?.focus()
   }
@@ -204,7 +218,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
           placeholder="Ce trebuie cumpărat?" maxLength={120} enterKeyHint="done" autoComplete="off" aria-label="Produs" />
         <input className="add-qty" value={qty} onChange={(e) => setQty(e.target.value)}
           placeholder="Cant." maxLength={20} enterKeyHint="done" autoComplete="off" aria-label="Cantitate" />
-        {speechSupported() && !name.trim() ? (
+        {speechSupported() && (listening || !name.trim()) ? (
           <button type="button" className={`add-btn mic ${listening ? 'listening' : ''}`} onClick={voice}
             aria-label={listening ? 'Oprește ascultarea' : 'Spune ce trebuie cumpărat'}>
             <IconMic />

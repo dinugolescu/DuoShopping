@@ -20,6 +20,21 @@ Acum regulile Firebase îi permit adminului să citească și conținutul listel
 - Ștergerea completă a unei liste străine: printr-o funcție pe server (Cloud Function), nu prin citire din telefonul adminului.
 - Text clar, vizibil pentru utilizatori (Setări sau la prima intrare), despre ce vede administratorul și ce nu.
 
+### Prima deschidere: întâi instalare, apoi un singur login
+
+Acum, pe iPhone, omul se loghează o dată în Safari și încă o dată în aplicația adăugată pe ecran, fiindcă aplicația de pe ecran nu preia login-ul din Safari. Pe Android, login-ul din Chrome trece de obicei în aplicația instalată.
+
+- Pe telefon, în browser, deschiderea adresei arată întâi un ecran de bun venit, fără login. Ecranul spune ce face aplicația, are alegerea iconiței și pașii de instalare, plus un link discret „Continuă în browser” pentru cine nu vrea s-o instaleze.
+- Login-ul se face o singură dată, în aplicația instalată.
+- Ordinea pașilor din mesajul de invitație se schimbă la fel: întâi pe ecran, apoi „Intră cu Google”.
+- Ecranul de bun venit nu apare în aplicația instalată și nici pe calculator, unde se intră direct.
+
+### Cardul „Pe scurt, cum merge” mai vizibil
+
+- La prima pornire apare ca fereastră în mijlocul ecranului, nu ca un card printre altele deasupra listei.
+- Butonul „Am înțeles” devine principal, mare, pe toată lățimea.
+- Ordinea la prima pornire: întâi sfaturile, apoi îndemnul la notificări, ca să nu apară toate odată.
+
 ### Setări păstrate în cont (opțional)
 
 Tema, fontul, ordinea listelor, gruparea pe raioane și sugestiile se pierd la reinstalare, fiindcă stau doar pe telefon. Le-am putea salva în cont, ca să revină automat. Iconița de pe ecran rămâne oricum fixată la adăugare.

@@ -11,9 +11,15 @@ import {
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
 import { productKey } from '../aisles.js'
 
+// Pe iPhone, login-ul din aplicația instalată merge doar dacă pagina de login e pe același domeniu
+// cu aplicația (vezi SETUP.md, pasul 5). Aplicația e publicată pe mai multe adrese Firebase, deci
+// pe oricare dintre ele folosim adresa curentă; altundeva (ex. localhost) pe cea din configurare.
+const host = window.location.host
+const authDomain = /\.(web\.app|firebaseapp\.com)$/.test(host) ? host : import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
+
 const app = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,

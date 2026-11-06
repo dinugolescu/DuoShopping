@@ -92,6 +92,8 @@ Mai trebuie autorizată adresa de întoarcere:
 2. **APIs & Services → Credentials → OAuth 2.0 Client IDs → „Web client (auto created by Google Service)”**.
 3. La **Authorized redirect URIs** adaugă `https://NUME-PROIECT.web.app/__/auth/handler` și salvează. Poate dura câteva minute până se aplică.
 
+Dacă publici aplicația și pe o a doua adresă (de exemplu `duoshopping.web.app`, ca site în plus în `firebase.json`), aplicația folosește automat adresa curentă pentru login. Pentru fiecare adresă nouă adaugă aici `https://ADRESA/__/auth/handler` și, în Firebase, adresa la Authentication → Settings → Authorized domains.
+
 ## 6. Publică aplicația
 
 ```bash

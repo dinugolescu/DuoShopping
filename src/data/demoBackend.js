@@ -239,3 +239,12 @@ export function watchAllowed(cb) {
 export function revokeAccess(email) {
   mutate((db) => { delete db.allowed[normEmail(email)] })
 }
+
+// ---------- Notificări (în demo nu se trimite nimic) ----------
+
+export const pushStatus = () => 'unsupported'
+export async function enablePush() { throw new Error('În modul demo nu există notificări.') }
+export async function disablePush() {}
+export async function announce() {
+  return { phones: 0, withoutPhone: [], demo: true }
+}

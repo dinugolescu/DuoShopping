@@ -431,3 +431,10 @@ div.center { padding: 48px 16px; }
 .swatches { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
 .swatch { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
 .swatch.active { box-shadow: 0 0 0 2px var(--accent); }
+
+/* Previzualizarea anunțului */
+.announce-preview {
+  display: flex; flex-direction: column; gap: 2px; margin: 10px 0 12px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--bg); white-space: pre-wrap;
+}
+.announce-preview + input { width: 100%; margin-bottom: 10px; }

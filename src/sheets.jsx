@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
 import { THEMES, FONTS, usePrefs, setPref } from './prefs.js'
 import { relTime } from './time.js'
-import { Sheet, Switch, firstName, useToast, errText } from './ui.jsx'
+import { Sheet, Switch, firstName, useToast, errText, store } from './ui.jsx'
+import { sessionSummary } from './data/shared.js'
 import { IconUp, IconChevron } from './icons.jsx'
 import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 
@@ -146,7 +147,7 @@ export function ShareSheet({ list, user, admin, onClose }) {
 
 // ---------- Setări ----------
 
-export function SettingsSheet({ onClose }) {
+export function SettingsSheet({ user, onClose }) {
   const prefs = usePrefs()
   // Încarcă toate fonturile ca să poată fi văzute înainte de alegere.
   useEffect(() => {
@@ -183,6 +184,8 @@ export function SettingsSheet({ onClose }) {
         Pe iPhone, iconița nouă apare după ce adaugi din nou aplicația pe ecran (Share → Add to Home Screen).
         Pe Android se poate actualiza singură în cel mult o zi; dacă nu, dezinstalează și instalează din nou.
       </p>
+
+      <PushSettings user={user} />
 
       <h3>Temă</h3>
       <div className="segmented" role="radiogroup" aria-label="Temă">
@@ -268,6 +271,97 @@ export function AdminSheet({ user, onClose }) {
           </li>
         ))}
       </ul>
+    </Sheet>
+  )
+}
+
+// ---------- Notificări: pornire pe telefonul ăsta ----------
+
+function PushSettings({ user }) {
+  const toast = useToast()
+  const [status, setStatus] = useState(() => api.pushStatus())
+  const [busy, setBusy] = useState(false)
+
+  async function toggle(on) {
+    setBusy(true)
+    try {
+      if (on) { await api.enablePush(user); toast('Notificările sunt pornite pe acest telefon') }
+      else await api.disablePush()
+    } catch (e) { toast(errText(e)) }
+    setStatus(api.pushStatus())
+    setBusy(false)
+  }
+
+  return (
+    <>
+      <h3>Notificări</h3>
+      {status === 'on' || status === 'off' ? (
+        <Switch checked={status === 'on'} onChange={(v) => !busy && toggle(v)}>
+          Primește anunțuri pe acest telefon
+          <span className="muted small block">Când cineva apasă „Anunță” după ce a lucrat pe o listă comună.</span>
+        </Switch>
+      ) : (
+        <p className="muted small">
+          {status === 'needs-install' && 'Pe iPhone, notificările merg doar din aplicația adăugată pe ecran (Share → Add to Home Screen). Deschide-o de acolo și pornește-le aici.'}
+          {status === 'denied' && 'Notificările sunt blocate pentru aplicație. Le poți permite din setările telefonului (Notificări → DuoShopping sau Chrome).'}
+          {status === 'unsupported' && (api.isDemo ? 'În modul demo nu există notificări.' : 'Browserul ăsta nu permite notificări.')}
+        </p>
+      )}
+    </>
+  )
+}
+
+// ---------- „Gata, anunță” ----------
+
+const DAY = 24 * 3600 * 1000
+
+export function AnnounceSheet({ list, user, onClose }) {
+  const toast = useToast()
+  const key = `anunt-${list.id}-${user.uid}`
+  const since = Math.max(store.get(key, 0), Date.now() - DAY)
+  const [items, setItems] = useState(null)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => api.watchItems(list.id, setItems, (e) => toast(errText(e))), [list.id, toast])
+
+  const others = list.memberEmails.filter((m) => m !== user.email)
+  const summary = items ? sessionSummary(items, user, since) : null
+  const text = summary ? [summary.text, note.trim()].filter(Boolean).join('\n') : ''
+
+  async function send() {
+    setBusy(true)
+    try {
+      const r = await api.announce(list.id, text)
+      store.set(key, Date.now())
+      if (r.demo) toast('În modul demo nu se trimit notificări')
+      else if (r.phones > 0) toast(r.withoutPhone.length ? `Trimis. Fără notificări pornite: ${r.withoutPhone.join(', ')}` : 'Anunț trimis')
+      else toast('Nimeni din listă nu are notificările pornite încă')
+      onClose()
+    } catch (e) {
+      toast(errText(e))
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Sheet title="Gata, anunță" onClose={onClose}>
+      {!others.length ? (
+        <p className="muted">Ești singur în lista „{list.name}”. Invită pe cineva ca să aibă cine primi anunțul.</p>
+      ) : (
+        <>
+          <p className="muted small">Ceilalți din „{list.name}” primesc o singură notificare cu ce ai făcut de la ultimul tău anunț.</p>
+          <div className="announce-preview">
+            <b>{list.name}</b>
+            <span>{summary ? summary.text : 'Se încarcă…'}</span>
+            {note.trim() && <span>{note.trim()}</span>}
+          </div>
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={150}
+            placeholder="Mesaj opțional, ex. Am luat tot, mai lipsește pâinea" aria-label="Mesaj opțional" />
+          <button className="btn primary wide" disabled={busy || !summary} onClick={send}>
+            {busy ? 'Se trimite…' : 'Trimite anunțul'}
+          </button>
+        </>
+      )}
     </Sheet>
   )
 }

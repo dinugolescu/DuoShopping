@@ -17,6 +17,7 @@ export function errText(e) {
   if (code === 'auth/unauthorized-domain') return 'Domeniul nu e autorizat în Firebase (vezi SETUP.md).'
   if (code === 'permission-denied' || code === 'firestore/permission-denied') return 'Nu ai voie să faci asta.'
   if (code === 'auth/network-request-failed') return 'Nu e conexiune la internet.'
+  if (code.startsWith('functions/') && e?.message && code !== 'functions/internal') return e.message
   if (e?.name === 'QuotaExceededError') return 'Nu mai e loc în browser (mod demo). Șterge câteva poze.'
   return 'Ceva n-a mers: ' + (e?.message || e)
 }

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
 import { ToastHost, useToast, errText, store } from './ui.jsx'
 import { ListView } from './ListView.jsx'
-import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet } from './sheets.jsx'
-import { IconChevron, IconUsers } from './icons.jsx'
+import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet } from './sheets.jsx'
+import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
 
@@ -97,7 +97,7 @@ function Home({ user, admin }) {
   const [lists, setLists] = useState(null)
   const [order, setOrder] = useState(() => store.get(ORDER_KEY, []))
   const [currentId, setCurrentId] = useState(() => store.get('lista-curenta'))
-  const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'settings' | 'admin' | null
+  const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
 
   useEffect(() => api.watchLists(user, setLists, (e) => toast(errText(e))), [user.uid, user.email, toast])
 
@@ -132,6 +132,11 @@ function Home({ user, admin }) {
           <IconChevron />
         </button>
         {current && (
+          <button className="icon-btn" onClick={() => setSheet('announce')} aria-label="Gata, anunță ceilalți">
+            <IconBell />
+          </button>
+        )}
+        {current && (
           <button className="icon-btn" onClick={() => setSheet('share')} aria-label="Cine vede lista">
             <IconUsers />
             {current.memberEmails.length > 1 && <span className="count">{current.memberEmails.length}</span>}
@@ -154,7 +159,8 @@ function Home({ user, admin }) {
         />
       )}
       {sheet === 'share' && current && <ShareSheet list={current} user={user} admin={admin} onClose={close} />}
-      {sheet === 'settings' && <SettingsSheet onClose={close} />}
+      {sheet === 'settings' && <SettingsSheet user={user} onClose={close} />}
+      {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} onClose={close} />}
       {sheet === 'admin' && admin && <AdminSheet user={user} onClose={close} />}
     </div>
   )

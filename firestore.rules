@@ -43,6 +43,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Telefoanele care primesc notificări. ID-ul documentului = codul FCM al telefonului.
+    // Le citește doar funcția `announce` (din cloud); aplicația doar își scrie și își șterge propriul cod.
+    match /pushTokens/{token} {
+      allow create, update: if isAllowed()
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'at', 'ua'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == myEmail();
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    // `announceLog` (limita de anunțuri) e folosit doar de funcție; aplicația nu are acces.
+
     match /lists/{listId} {
       function list() {
         return get(/databases/$(database)/documents/lists/$(listId)).data;

@@ -11,6 +11,8 @@ export default defineConfig({
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: { ...APP, icons: manifestIcons(iconKey(DEFAULT_ICON.design, DEFAULT_ICON.color)) },
       workbox: {
+        // Afișarea notificărilor push (public/push-sw.js).
+        importScripts: ['push-sw.js'],
         // /__/auth/* e handler-ul de login Firebase; service worker-ul nu trebuie să-l intercepteze.
         navigateFallbackDenylist: [/^\/__\//],
         // Fonturile alese din setări se păstrează local, ca aplicația să arate la fel și fără semnal.

@@ -12,4 +12,5 @@ export const {
   watchProducts,
   watchMessages, sendMessage, toggleReaction, deleteMessage,
   watchAllLists, watchAllowed, revokeAccess,
+  pushStatus, enablePush, disablePush, announce,
 } = backend

@@ -16,6 +16,7 @@ const app = initializeApp({
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
 })
 const auth = getAuth(app)
 // Cache local persistent: lista merge și fără semnal, scrierile se trimit când revine rețeaua.
@@ -56,7 +57,11 @@ export async function signIn() {
   }
 }
 
-export const signOut = () => fbSignOut(auth)
+export async function signOut() {
+  // Telefonul nu mai primește notificări pentru contul din care ai ieșit.
+  await disablePush().catch((e) => console.error(e))
+  return fbSignOut(auth)
+}
 
 // cb({ ready, allowed, admin }). Un document lipsă citit doar din cache (offline, prima dată)
 // nu e considerat răspuns final, ca să nu afișăm greșit „nu ai acces”.
@@ -267,4 +272,58 @@ export function watchAllowed(cb, onError) {
 
 export function revokeAccess(email) {
   fire(deleteDoc(doc(db, 'allowed', normEmail(email))))
+}
+
+// ---------- Notificări ----------
+// Modulele de notificări se încarcă doar când e nevoie, ca aplicația să pornească la fel de repede.
+
+const TOKEN_KEY = 'push-token'
+const storedToken = () => { try { return localStorage.getItem(TOKEN_KEY) } catch { return null } }
+
+// 'unsupported' | 'needs-install' (iPhone, din Safari) | 'denied' | 'on' | 'off'
+export function pushStatus() {
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+  if (!supported) return /iPhone|iPad/.test(navigator.userAgent) && !isStandalone() ? 'needs-install' : 'unsupported'
+  if (Notification.permission === 'denied') return 'denied'
+  return Notification.permission === 'granted' && storedToken() ? 'on' : 'off'
+}
+
+async function messaging() {
+  const m = await import('firebase/messaging')
+  if (!(await m.isSupported())) throw new Error('Telefonul sau browserul nu permite notificări.')
+  return { m, messaging: m.getMessaging(app) }
+}
+
+export async function enablePush(user) {
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') throw new Error('Notificările nu au fost permise.')
+  const { m, messaging: msg } = await messaging()
+  const reg = await navigator.serviceWorker.ready
+  const opts = { serviceWorkerRegistration: reg }
+  if (import.meta.env.VITE_FIREBASE_VAPID_KEY) opts.vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
+  const token = await m.getToken(msg, opts)
+  if (!token) throw new Error('Nu am primit un cod de notificare de la Google.')
+  await setDoc(doc(db, 'pushTokens', token), {
+    uid: user.uid, email: user.email, at: serverTimestamp(), ua: navigator.userAgent.slice(0, 200),
+  })
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export async function disablePush() {
+  const token = storedToken()
+  if (!token) return
+  localStorage.removeItem(TOKEN_KEY)
+  await deleteDoc(doc(db, 'pushTokens', token)).catch((e) => console.error(e))
+  try {
+    const { m, messaging: msg } = await messaging()
+    await m.deleteToken(msg)
+  } catch (e) { console.error(e) }
+}
+
+// Trimite anunțul celorlalți membri. Întoarce { phones, withoutPhone: [emailuri] }.
+export async function announce(listId, text) {
+  const { getFunctions, httpsCallable } = await import('firebase/functions')
+  const call = httpsCallable(getFunctions(app, 'europe-central2'), 'announce')
+  const res = await call({ listId, text })
+  return res.data
 }

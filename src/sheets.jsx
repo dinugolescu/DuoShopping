@@ -197,7 +197,14 @@ export function SettingsSheet({ user, onClose }) {
         Sugestii din istoric
         <span className="muted small block">Când scrii, propune produse adăugate înainte pe lista curentă.</span>
       </Switch>
-      <p className="muted small">Setările se salvează doar pe acest telefon.</p>
+      <p className="muted small">Setările se păstrează în contul tău și revin singure dacă reinstalezi aplicația.</p>
+
+      <h3>Confidențialitate</h3>
+      <p className="muted small">
+        Listele tale le văd doar oamenii pe care îi inviți în ele. Administratorul aplicației vede doar numele
+        listelor, cine e în ele și câte produse au, ca să poată face curat; nu vede produsele, mesajele sau pozele.
+        Pozele din chat se șterg când golești produsele rezolvate.
+      </p>
     </Sheet>
   )
 }
@@ -213,8 +220,11 @@ export function AdminSheet({ user, onClose }) {
 
   async function del(l) {
     if (!window.confirm(`Ștergi lista „${l.name}” (${products(l.itemCount)}) pentru toți membrii ei? Nu se poate anula.`)) return
-    await api.deleteList(l.id)
-    toast(`Lista „${l.name}” a fost ștearsă`)
+    try {
+      if (l.memberEmails.includes(user.email)) await api.deleteList(l.id)
+      else await api.adminDeleteList(l.id)
+      toast(`Lista „${l.name}” a fost ștearsă`)
+    } catch (e) { toast(errText(e)) }
   }
 
   function revoke(a) {
@@ -225,7 +235,10 @@ export function AdminSheet({ user, onClose }) {
   return (
     <Sheet title="Administrare" onClose={onClose}>
       <h3>Toate listele ({lists?.length ?? '…'})</h3>
-      <p className="muted small">Vezi doar numele, membrii și câte produse au. Conținutul îl văd doar membrii.</p>
+      <p className="muted small">
+        Vezi doar numele, membrii și câte produse au. Produsele, mesajele și pozele le văd doar membrii;
+        nici regulile bazei de date nu-ți permit să le citești.
+      </p>
       <ul className="members">
         {lists?.map((l) => (
           <li key={l.id}>

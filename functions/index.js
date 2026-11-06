@@ -63,3 +63,19 @@ export const announce = onCall(async (req) => {
 
   return { phones: res.successCount, withoutPhone }
 })
+
+// Adminul poate șterge orice listă, dar nu are voie să-i citească conținutul (vezi firestore.rules).
+// Ștergerea completă (produse, mesaje, poze, catalog) o face deci serverul.
+export const adminDeleteList = onCall(async (req) => {
+  const token = req.auth?.token
+  const email = token?.email?.toLowerCase()
+  if (!email || token.email_verified !== true) throw new HttpsError('unauthenticated', 'Intră în cont.')
+  if (!(await db.doc(`admins/${email}`).get()).exists) throw new HttpsError('permission-denied', 'Doar adminul poate șterge listele altora.')
+
+  const { listId } = req.data || {}
+  if (typeof listId !== 'string' || !listId || listId.includes('/')) throw new HttpsError('invalid-argument', 'Lista lipsește.')
+  const ref = db.doc(`lists/${listId}`)
+  if (!(await ref.get()).exists) throw new HttpsError('not-found', 'Lista nu mai există.')
+  await db.recursiveDelete(ref)
+  return { ok: true }
+})

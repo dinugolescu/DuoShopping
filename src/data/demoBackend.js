@@ -105,6 +105,15 @@ export async function deleteList(listId) {
   })
 }
 
+export async function loadUserPrefs(uid) {
+  return JSON.parse(localStorage.getItem(`demo-userprefs-${uid}`) || 'null')
+}
+export function saveUserPrefs(uid, prefs) {
+  localStorage.setItem(`demo-userprefs-${uid}`, JSON.stringify(prefs))
+}
+
+export const adminDeleteList = (listId) => deleteList(listId)
+
 export function setListAisles(listId, aisles) {
   mutate((db) => { db.lists[listId].aisles = aisles })
 }

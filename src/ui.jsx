@@ -86,6 +86,9 @@ if (typeof window !== 'undefined') {
   })
 }
 
+// Există ferestre deschise? (actualizarea automată nu reîncarcă peste ele)
+export const hasOpenLayers = () => layers.length > 0
+
 export function useBackClose(onClose) {
   const ref = useRef(onClose)
   ref.current = onClose

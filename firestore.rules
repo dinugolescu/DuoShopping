@@ -4,8 +4,9 @@ rules_version = '2';
 // - În aplicație intră doar adresele din colecția `allowed` (puse acolo la invitare) și adminii (`admins`).
 // - O listă o văd doar membrii ei. Orice membru poate invita; scoate oameni doar creatorul listei sau adminul.
 //   Oricine poate ieși singur dintr-o listă (în afară de creator, care o poate șterge).
-// - Adminul vede toate listele (nume, membri, număr de produse) și le poate șterge. Interfața nu îi arată
-//   conținutul listelor în care nu e membru, dar regulile îi permit să-l citească, ca să poată șterge tot.
+// - Adminul vede toate listele (doar nume, membri, număr de produse), nu și conținutul lor (produse,
+//   mesaje, poze), decât în listele în care e membru. O listă străină o șterge prin funcția `adminDeleteList`.
+// - `userPrefs/{uid}`: setările de aspect ale fiecăruia (temă, font etc.), doar pentru el.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -54,12 +55,17 @@ service cloud.firestore {
     }
     // `announceLog` (limita de anunțuri) e folosit doar de funcție; aplicația nu are acces.
 
+    match /userPrefs/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['prefs', 'at'])
+        && request.resource.data.prefs is map
+        && request.resource.data.prefs.size() <= 20;
+    }
+
     match /lists/{listId} {
       function list() {
         return get(/databases/$(database)/documents/lists/$(listId)).data;
-      }
-      function canUse() {
-        return isMember(list()) || isAdmin();
       }
       function validList(l) {
         return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles'])
@@ -93,7 +99,6 @@ service cloud.firestore {
       // Catalogul de produse folosite (sugestii și raionul ținut minte).
       match /products/{key} {
         allow read, write: if isMember(list());
-        allow read, delete: if isAdmin();
       }
 
       match /items/{itemId} {
@@ -103,7 +108,7 @@ service cloud.firestore {
             && i.archived is bool;
         }
 
-        allow read, delete: if canUse();
+        allow read, delete: if isMember(list());
         allow create: if isMember(list())
           && validItem(request.resource.data)
           && request.resource.data.addedBy.uid == request.auth.uid;
@@ -112,7 +117,7 @@ service cloud.firestore {
           && request.resource.data.addedBy == resource.data.addedBy;
 
         match /messages/{msgId} {
-          allow read, delete: if canUse();
+          allow read, delete: if isMember(list());
           allow create: if isMember(list())
             && request.resource.data.keys().hasOnly(['text', 'photo', 'by', 'at', 'reactions'])
             && request.resource.data.by.uid == request.auth.uid

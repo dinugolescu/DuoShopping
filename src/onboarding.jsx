@@ -2,9 +2,10 @@
 // pe ecranul principal, avertismentul pentru browserele din aplicații și sfaturile de început.
 import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
-import { Sheet, store, useToast, firstName, errText } from './ui.jsx'
+import { Sheet, store, useToast, firstName, errText, useBackClose } from './ui.jsx'
 import { usePrefs, setPref } from './prefs.js'
 import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
+import { speechSupported } from './voice.js'
 
 // Adresa pe care o trimitem în invitații (VITE_APP_URL, altfel adresa curentă).
 export const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin
@@ -56,8 +57,8 @@ export function inviteText({ fromName, email, listName }) {
     '',
     `1. Deschide linkul: ${APP_URL}`,
     '   Pe iPhone deschide-l în Safari, pe Android în Chrome (nu în browserul din WhatsApp sau Facebook).',
-    `2. Apasă „Intră cu Google” și alege contul ${email}.`,
-    '3. Pune aplicația pe ecranul principal: pe iPhone butonul Partajează → „Adaugă pe ecranul principal”, pe Android meniul ⋮ → „Instalează aplicația”.',
+    '2. Alege iconița și pune aplicația pe ecranul principal, cum îți arată pagina.',
+    `3. Deschide DuoShopping de pe ecran, apasă „Intră cu Google” și alege contul ${email}.`,
   ].join('\n')
 }
 
@@ -122,15 +123,6 @@ export function InviteShare({ user, email, listName }) {
 // ---------- Instalarea pe ecranul principal ----------
 
 export function InstallSheet({ onClose }) {
-  const prompt = useInstallPrompt()
-  const toast = useToast()
-
-  async function install() {
-    prompt.prompt()
-    const { outcome } = await prompt.userChoice
-    if (outcome === 'accepted') { toast('Gata, o găsești pe ecranul principal'); onClose() }
-  }
-
   return (
     <Sheet title="Pune aplicația pe ecran" onClose={onClose}>
       <p className="muted small">
@@ -143,30 +135,84 @@ export function InstallSheet({ onClose }) {
           <h3>Apoi</h3>
         </>
       )}
-      {isInstalled() ? (
-        <p>Aplicația e deja instalată pe acest telefon.</p>
-      ) : device.inApp ? (
-        <InAppSteps />
-      ) : device.ios ? (
-        <ol className="steps">
-          {device.iosOtherBrowser && <li>Cel mai sigur merge din <b>Safari</b>: copiază linkul și deschide-l acolo.</li>}
-          <li>Apasă butonul <b>Partajează</b> (pătratul cu săgeata în sus{device.iosOtherBrowser ? ', din bara de adresă' : ', jos în mijloc'}).</li>
-          <li>Derulează și alege <b>„Adaugă pe ecranul principal”</b>.</li>
-          <li>Apasă <b>„Adaugă”</b>, apoi deschide DuoShopping de pe ecran, nu din browser.</li>
-          <li>Acolo intri din nou cu Google și pornești notificările: aplicația de pe ecran nu le preia din Safari.</li>
-        </ol>
-      ) : prompt ? (
-        <button className="btn primary wide" onClick={install}>Instalează DuoShopping</button>
-      ) : device.android ? (
-        <ol className="steps">
-          <li>Deschide linkul în <b>Chrome</b>.</li>
-          <li>Apasă meniul <b>⋮</b> din dreapta sus.</li>
-          <li>Alege <b>„Instalează aplicația”</b> sau <b>„Adaugă pe ecranul principal”</b>, apoi <b>„Instalează”</b>.</li>
-        </ol>
-      ) : (
-        <p>Pe calculator, folosește iconița de instalare din bara de adresă a browserului (Chrome sau Edge).</p>
-      )}
+      <InstallSteps onInstalled={onClose} />
     </Sheet>
+  )
+}
+
+// Pașii de instalare potriviți telefonului și browserului.
+function InstallSteps({ onInstalled }) {
+  const prompt = useInstallPrompt()
+  const toast = useToast()
+
+  async function install() {
+    prompt.prompt()
+    const { outcome } = await prompt.userChoice
+    if (outcome === 'accepted') { toast('Gata, o găsești pe ecranul principal'); onInstalled?.() }
+  }
+
+  if (isInstalled()) return <p>Aplicația e deja instalată pe acest telefon.</p>
+  if (device.inApp) return <InAppSteps />
+  if (device.ios) {
+    return (
+      <ol className="steps">
+        {device.iosOtherBrowser && <li>Cel mai sigur merge din <b>Safari</b>: copiază linkul și deschide-l acolo.</li>}
+        <li>Apasă butonul <b>Partajează</b> (pătratul cu săgeata în sus{device.iosOtherBrowser ? ', din bara de adresă' : ', jos în mijloc'}).</li>
+        <li>Derulează și alege <b>„Adaugă pe ecranul principal”</b>.</li>
+        <li>Apasă <b>„Adaugă”</b>, apoi deschide DuoShopping de pe ecran, nu din browser.</li>
+        <li>Acolo intri cu Google și pornești notificările: aplicația de pe ecran nu le preia din Safari.</li>
+      </ol>
+    )
+  }
+  if (prompt) return <button className="btn primary wide" onClick={install}>Instalează DuoShopping</button>
+  if (device.android) {
+    return (
+      <ol className="steps">
+        <li>Deschide linkul în <b>Chrome</b>.</li>
+        <li>Apasă meniul <b>⋮</b> din dreapta sus.</li>
+        <li>Alege <b>„Instalează aplicația”</b> sau <b>„Adaugă pe ecranul principal”</b>, apoi <b>„Instalează”</b>.</li>
+        <li>Deschide DuoShopping de pe ecran.</li>
+      </ol>
+    )
+  }
+  return <p>Pe calculator, folosește iconița de instalare din bara de adresă a browserului (Chrome sau Edge).</p>
+}
+
+// ---------- Ecranul de bun venit ----------
+// Pe telefon, în browser, înainte de login: ce face aplicația, iconița și instalarea. Login-ul se face
+// apoi o singură dată, în aplicația de pe ecran (pe iPhone, aceea nu preia login-ul din Safari).
+
+const BROWSER_KEY = 'continua-in-browser'
+export const showWelcome = () => device.mobile && !isInstalled() && !store.get(BROWSER_KEY, false)
+
+export function Welcome({ logo, onContinue }) {
+  return (
+    <main className="welcome">
+      {logo}
+      <h1>DuoShopping</h1>
+      <p className="muted">Lista de cumpărături comună a familiei, pe toate telefoanele.</p>
+      <ul className="features">
+        <li><span aria-hidden="true">🔄</span> Ce adaugă unul apare pe loc pe telefoanele celorlalți.</li>
+        <li><span aria-hidden="true">🔔</span> Cu un buton anunți că ai terminat lista sau că ai ajuns la magazin.</li>
+        <li><span aria-hidden="true">🛒</span> Produsele se așază singure pe raioane, în ordinea magazinului tău.</li>
+        <li><span aria-hidden="true">💬</span> Discuții și poze la fiecare produs: „care marcă?”, „asta?”.</li>
+      </ul>
+      {device.inApp ? (
+        <div className="warn-box"><b>Deschide linkul în {device.ios ? 'Safari' : 'Chrome'}</b><InAppSteps /></div>
+      ) : (
+        <div className="welcome-steps">
+          <h3>1. Alege iconița</h3>
+          <IconPicker />
+          <h3>2. Pune aplicația pe ecran</h3>
+          <InstallSteps />
+          <h3>3. Intră din aplicație</h3>
+          <p className="small">Deschide DuoShopping de pe ecran și intră cu Google. Te loghezi o singură dată, direct acolo.</p>
+        </div>
+      )}
+      <button className="link-btn" onClick={() => { store.set(BROWSER_KEY, true); onContinue() }}>
+        Continuă în browser, fără instalare
+      </button>
+    </main>
   )
 }
 
@@ -212,22 +258,27 @@ export function InstallBanner({ onOpen }) {
 }
 
 // ---------- Sfaturi la început ----------
+// La prima pornire, ca fereastră în mijlocul ecranului; îndemnul la notificări vine abia după ea.
 
 const TIPS_KEY = 'sfaturi-vazute'
-export function Tips() {
-  const [seen, setSeen] = useState(() => store.get(TIPS_KEY, false))
-  if (seen) return null
+export const tipsSeen = () => store.get(TIPS_KEY, false)
+
+export function Tips({ onDone }) {
+  const done = () => { store.set(TIPS_KEY, true); onDone() }
+  useBackClose(done)
   return (
-    <section className="tips">
-      <h3>Pe scurt, cum merge</h3>
-      <ul>
-        <li><span aria-hidden="true">✍️</span> Scrie ce lipsește. Produsele se așază singure pe raioane.</li>
-        <li><span aria-hidden="true">🔔</span> Când termini de completat, apasă clopoțelul ca să-i anunți pe ceilalți.</li>
-        <li><span aria-hidden="true">🛒</span> În magazin pornește „Mod magazin”: ecranul rămâne aprins cât bifezi.</li>
-        <li><span aria-hidden="true">☰</span> Din meniu pui raioanele în ordinea magazinului tău și vezi istoricul.</li>
-      </ul>
-      <button className="btn small" onClick={() => { store.set(TIPS_KEY, true); setSeen(true) }}>Am înțeles</button>
-    </section>
+    <div className="modal-backdrop">
+      <section className="modal" role="dialog" aria-modal="true" aria-label="Pe scurt, cum merge">
+        <h2>Pe scurt, cum merge</h2>
+        <ul className="features">
+          <li><span aria-hidden="true">✍️</span> Scrie ce lipsește{speechSupported() ? ' sau apasă 🎤 și spune' : ''}. Mai multe deodată, cu virgulă: „lapte, ouă, două pâini”. Produsele se așază singure pe raioane.</li>
+          <li><span aria-hidden="true">🔔</span> Când termini de completat, apasă clopoțelul ca să-i anunți pe ceilalți.</li>
+          <li><span aria-hidden="true">🛒</span> În magazin pornește „Mod magazin”: ecranul rămâne aprins cât bifezi.</li>
+          <li><span aria-hidden="true">☰</span> Din meniu pui raioanele în ordinea magazinului tău și vezi istoricul.</li>
+        </ul>
+        <button className="btn primary wide big" onClick={done}>Am înțeles</button>
+      </section>
+    </div>
   )
 }
 

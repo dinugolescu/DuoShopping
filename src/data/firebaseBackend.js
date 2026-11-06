@@ -5,7 +5,7 @@ import {
 } from 'firebase/auth'
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, limit,
+  collection, doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, limit,
   serverTimestamp, arrayUnion, arrayRemove, increment, writeBatch, FieldPath,
 } from 'firebase/firestore'
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
@@ -160,6 +160,12 @@ export async function deleteList(listId) {
   fire(deleteRefs(refs))
 }
 
+// Adminul șterge o listă în care nu e membru: conținutul nu-l poate citi, deci îl șterge serverul.
+export async function adminDeleteList(listId) {
+  const { getFunctions, httpsCallable } = await import('firebase/functions')
+  await httpsCallable(getFunctions(app, 'europe-central2'), 'adminDeleteList')({ listId })
+}
+
 // Invitația pune adresa în listă și îi dă acces în aplicație.
 export function invite(list, user, email) {
   const e = normEmail(email)
@@ -312,6 +318,17 @@ export function watchAllowed(cb, onError) {
 
 export function revokeAccess(email) {
   fire(deleteDoc(doc(db, 'allowed', normEmail(email))))
+}
+
+// ---------- Setări în cont ----------
+
+export async function loadUserPrefs(uid) {
+  const snap = await getDoc(doc(db, 'userPrefs', uid))
+  return snap.exists() ? snap.data().prefs : null
+}
+
+export function saveUserPrefs(uid, prefs) {
+  fire(setDoc(doc(db, 'userPrefs', uid), { prefs, at: serverTimestamp() }))
 }
 
 // ---------- Notificări ----------

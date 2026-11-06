@@ -4,9 +4,9 @@ import { ToastHost, useToast, errText, store } from './ui.jsx'
 import { ListView } from './ListView.jsx'
 import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
-import { usePrefs } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
+import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
-import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt } from './onboarding.jsx'
+import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt, Welcome, showWelcome, tipsSeen } from './onboarding.jsx'
 
 export default function App() {
   return (
@@ -39,12 +39,14 @@ function Root() {
 }
 
 function Login() {
+  const [welcome, setWelcome] = useState(showWelcome)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   async function go(i) {
     setErr(''); setBusy(true)
     try { await api.signIn(i) } catch (e) { setErr(errText(e) || '') } finally { setBusy(false) }
   }
+  if (welcome) return <Welcome logo={<Logo />} onContinue={() => setWelcome(false)} />
   return (
     <main className="login">
       <Logo />
@@ -92,16 +94,17 @@ function NoAccess({ user }) {
   )
 }
 
-const ORDER_KEY = 'ordine-liste'
 const FIRST_LIST = 'Cumpărături'
 
 function Home({ user, admin }) {
   const toast = useToast()
   const [lists, setLists] = useState(null)
-  const [order, setOrder] = useState(() => store.get(ORDER_KEY, []))
+  const order = usePrefs().listOrder
   const [currentId, setCurrentId] = useState(() => store.get('lista-curenta'))
+  const [tipsDone, setTipsDone] = useState(tipsSeen)
   const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
 
+  useEffect(() => startPrefsSync(user.uid, api), [user.uid])
   useEffect(() => api.watchLists(user, (ls, meta) => {
     setLists(ls)
     // Prima intrare: cine n-are nicio listă primește una gata făcută. O singură dată per cont,
@@ -126,8 +129,7 @@ function Home({ user, admin }) {
     const i = ids.indexOf(id), j = i + dir
     if (j < 0 || j >= ids.length) return
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
-    setOrder(ids)
-    store.set(ORDER_KEY, ids)
+    setPref('listOrder', ids)
   }
 
   const create = (name) => setCurrentId(api.createList(user, name))
@@ -156,8 +158,8 @@ function Home({ user, admin }) {
       </header>
 
       <InstallBanner onOpen={() => setSheet('install')} />
-      {current && <PushPrompt user={user} />}
-      {current && <Tips />}
+      {current && tipsDone && <PushPrompt user={user} />}
+      {current && !tipsDone && <Tips onDone={() => setTipsDone(true)} />}
       {current
         ? <ListView key={current.id} list={current} user={user} />
         : <EmptyLists user={user} onCreate={create} onMenu={() => setSheet('menu')} />}

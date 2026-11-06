@@ -1,4 +1,5 @@
-// Preferințe salvate pe fiecare telefon în parte (localStorage).
+// Preferințe: salvate pe telefon (localStorage) și copiate în cont (vezi startPrefsSync),
+// ca să revină după o reinstalare.
 import { useEffect, useState } from 'react'
 import { DEFAULT_ICON, iconDataUrl, iconKey } from './appIcons.js'
 
@@ -16,21 +17,61 @@ export const FONTS = [
   { id: 'hand', label: 'Patrick Hand (scris de mână)', css: '"Patrick Hand", cursive', google: 'Patrick+Hand' },
 ]
 
-const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color }
+const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [] }
 const KEY = 'cumparaturi-prefs'
 
 function load() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY)) } } catch { return { ...DEFAULTS } }
+  let saved = {}
+  try { saved = JSON.parse(localStorage.getItem(KEY)) || {} } catch { /* ignorăm */ }
+  // Ordinea listelor stătea înainte într-o cheie separată.
+  if (!saved.listOrder) { try { saved.listOrder = JSON.parse(localStorage.getItem('ordine-liste')) || [] } catch { /* ignorăm */ } }
+  return { ...DEFAULTS, ...saved }
 }
 
 let current = load()
 const subs = new Set()
 
-export function setPref(key, value) {
-  current = { ...current, [key]: value }
+const changeSubs = new Set()
+
+function commit(next, fromAccount = false) {
+  current = next
   try { localStorage.setItem(KEY, JSON.stringify(current)) } catch { /* ignorăm */ }
   apply(current)
   subs.forEach((f) => f(current))
+  if (!fromAccount) changeSubs.forEach((f) => f(current))
+}
+
+export function setPref(key, value) {
+  commit({ ...current, [key]: value })
+}
+
+// ---------- Sincronizarea cu contul ----------
+// La prima intrare pe un telefon (sau după reinstalare) luăm setările din cont, dacă există;
+// altfel le trimitem pe cele de pe telefon. După aceea, fiecare schimbare ajunge și în cont.
+
+const KNOWN = Object.keys(DEFAULTS)
+const clean = (p) => Object.fromEntries(KNOWN.filter((k) => k in p).map((k) => [k, p[k]]))
+
+export function startPrefsSync(uid, { loadUserPrefs, saveUserPrefs }) {
+  const flag = `prefs-sync-${uid}`
+  let alive = true
+  let timer
+  const push = () => { clearTimeout(timer); timer = setTimeout(() => saveUserPrefs(uid, clean(current)), 1500) }
+
+  ;(async () => {
+    let remote
+    try { remote = await loadUserPrefs(uid) } catch { return } // fără rețea: încercăm la pornirea următoare
+    if (!alive) return
+    let synced = false
+    try { synced = localStorage.getItem(flag) === '1' } catch { /* ignorăm */ }
+    if (!synced && remote) commit({ ...DEFAULTS, ...clean(remote) }, true)
+    else push()
+    try { localStorage.setItem(flag, '1') } catch { /* ignorăm */ }
+  })()
+
+  const onChange = () => push()
+  changeSubs.add(onChange)
+  return () => { alive = false; changeSubs.delete(onChange) }
 }
 
 export function usePrefs() {

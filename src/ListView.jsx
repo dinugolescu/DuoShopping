@@ -7,7 +7,8 @@ import { usePrefs } from './prefs.js'
 import { Sheet, firstName, store, useNow, useToast, errText } from './ui.jsx'
 import { ChatSheet } from './Chat.jsx'
 import { sendAnnounce, atShopText } from './sheets.jsx'
-import { IconCheck, IconX, IconPlus, IconChevron, IconChat } from './icons.jsx'
+import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic } from './icons.jsx'
+import { speechSupported, listen, speechErrText, parseProducts } from './voice.js'
 
 const SEEN_KEY = 'mesaje-vazute'
 const itemAisle = (i, aisles) => aisleIn(aisles, i.aisle || guessAisle(i.name, aisles))
@@ -48,14 +49,31 @@ export function ListView({ list, user }) {
     toast(text, () => api.setStatus(list.id, item.id, user, ...prev))
   }
 
-  function add({ name, quantity = '' }) {
+  function add({ name, quantity = '' }, quiet = false) {
     const n = name.trim()
     const dup = pending.find((i) => normalize(i.name) === normalize(n))
-    if (dup) { toast(`„${dup.name}” e deja pe listă`); return false }
+    if (dup) { if (!quiet) toast(`„${dup.name}” e deja pe listă`); return false }
     const known = productMap.get(productKey(n))
     const aisle = known?.aisle && aisles.some((a) => a.id === known.aisle) ? known.aisle : guessAisle(n, aisles)
     api.addItem(list.id, user, { name: n, quantity, aisle })
     return true
+  }
+
+  // Mai multe produse deodată (din voce sau din text cu virgule).
+  function addMany(products) {
+    const seen = new Set()
+    const added = [], already = []
+    for (const p of products) {
+      const k = normalize(p.name)
+      if (seen.has(k)) continue
+      seen.add(k)
+      ;(add(p, true) ? added : already).push(p.name)
+    }
+    const parts = []
+    if (added.length) parts.push(`Am adăugat: ${added.join(', ')}`)
+    if (already.length) parts.push(`deja pe listă: ${already.join(', ')}`)
+    toast(parts.join('; ') || 'N-am găsit niciun produs.')
+    return added.length > 0
   }
 
   function finish() {
@@ -94,7 +112,7 @@ export function ListView({ list, user }) {
 
   return (
     <main className="list">
-      <AddForm onAdd={add} products={products} pending={pending} enabled={prefs.suggestions} />
+      <AddForm onAdd={add} onAddMany={addMany} products={products} pending={pending} enabled={prefs.suggestions} />
       <ShopMode list={list} user={user} pendingCount={pending.length} />
 
       {pending.length === 0 ? (
@@ -134,10 +152,24 @@ export function ListView({ list, user }) {
   )
 }
 
-function AddForm({ onAdd, products, pending, enabled }) {
+function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
+  const toast = useToast()
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
+  const [listening, setListening] = useState(false)
   const ref = useRef()
+  const stop = useRef(null)
+  useEffect(() => () => stop.current?.(), [])
+
+  function voice() {
+    if (listening) { stop.current?.(); return }
+    setListening(true)
+    stop.current = listen({
+      onText: (text) => onAddMany(parseProducts(text, { spoken: true })),
+      onError: (code) => { const t = speechErrText(code); if (t) toast(t) },
+      onEnd: () => { setListening(false); stop.current = null },
+    })
+  }
 
   const suggestions = useMemo(() => {
     const q = normalize(name)
@@ -154,7 +186,9 @@ function AddForm({ onAdd, products, pending, enabled }) {
   function submit(e) {
     e.preventDefault()
     if (!name.trim()) return
-    if (onAdd({ name, quantity: qty })) { setName(''); setQty('') }
+    // Cu virgule și fără cantitate separată: sunt mai multe produse („lapte, ouă, două pâini”).
+    const many = !qty.trim() && /[,;]/.test(name) ? parseProducts(name) : null
+    if (many && many.length > 1 ? onAddMany(many) : onAdd({ name, quantity: qty })) { setName(''); setQty('') }
     ref.current?.focus()
   }
 
@@ -170,7 +204,14 @@ function AddForm({ onAdd, products, pending, enabled }) {
           placeholder="Ce trebuie cumpărat?" maxLength={120} enterKeyHint="done" autoComplete="off" aria-label="Produs" />
         <input className="add-qty" value={qty} onChange={(e) => setQty(e.target.value)}
           placeholder="Cant." maxLength={20} enterKeyHint="done" autoComplete="off" aria-label="Cantitate" />
-        <button className="add-btn" disabled={!name.trim()} aria-label="Adaugă"><IconPlus /></button>
+        {speechSupported() && !name.trim() ? (
+          <button type="button" className={`add-btn mic ${listening ? 'listening' : ''}`} onClick={voice}
+            aria-label={listening ? 'Oprește ascultarea' : 'Spune ce trebuie cumpărat'}>
+            <IconMic />
+          </button>
+        ) : (
+          <button className="add-btn" disabled={!name.trim()} aria-label="Adaugă"><IconPlus /></button>
+        )}
       </form>
       {suggestions.length > 0 && (
         <div className="suggestions" aria-label="Sugestii din istoric">

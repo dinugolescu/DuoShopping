@@ -25,3 +25,6 @@ export const IconSend = (p) => <svg {...base} {...p}><path d="M4 12l16-8-6 16-2.
 export const IconBell = (p) => (
   <svg {...base} {...p}><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15zM10 20.5a2 2 0 004 0" /></svg>
 )
+export const IconMic = (p) => (
+  <svg {...base} {...p}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+)

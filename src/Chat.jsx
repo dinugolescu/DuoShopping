@@ -4,7 +4,7 @@ import * as api from './data/index.js'
 import { REACTIONS } from './data/shared.js'
 import { compressImage } from './image.js'
 import { relTime } from './time.js'
-import { Sheet, firstName, useNow, useToast, errText } from './ui.jsx'
+import { Sheet, firstName, useNow, useToast, errText, useBackClose } from './ui.jsx'
 import { IconCamera, IconSend, IconX } from './icons.jsx'
 
 export function ChatSheet({ list, item, user, onClose }) {
@@ -71,6 +71,7 @@ export function ChatSheet({ list, item, user, onClose }) {
                   <img src={m.photo} alt="Poză trimisă în discuție" className="msg-photo"
                     onClick={(e) => { e.stopPropagation(); setZoom(m.photo) }} />
                 )}
+                {m.photoDeleted && <span className="msg-text muted small">📷 poză ștearsă la golirea listei</span>}
                 {m.text && <span className="msg-text">{m.text}</span>}
                 <span className="msg-time">{relTime(m.at, now)}</span>
               </button>
@@ -116,11 +117,16 @@ export function ChatSheet({ list, item, user, onClose }) {
         <button className="add-btn" disabled={busy || (!text.trim() && !photo)} aria-label="Trimite"><IconSend /></button>
       </form>
 
-      {zoom && (
-        <div className="lightbox" onClick={() => setZoom(null)} role="dialog" aria-label="Poză mărită">
-          <img src={zoom} alt="Poză mărită" />
-        </div>
-      )}
+      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
     </Sheet>
+  )
+}
+
+function Lightbox({ src, onClose }) {
+  useBackClose(onClose)
+  return (
+    <div className="lightbox" onClick={onClose} role="dialog" aria-label="Poză mărită">
+      <img src={src} alt="Poză mărită" />
+    </div>
   )
 }

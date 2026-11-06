@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './data/index.js'
 import { SKIP_REASONS, CUSTOM, reasonLabel } from './config.js'
-import { AISLES, guessAisle, normalize, productKey } from './aisles.js'
+import { listAisles, aisleIn, guessAisle, normalize, productKey } from './aisles.js'
 import { relTime, fullDate } from './time.js'
 import { usePrefs } from './prefs.js'
 import { Sheet, firstName, store, useNow, useToast, errText } from './ui.jsx'
 import { ChatSheet } from './Chat.jsx'
+import { sendAnnounce, atShopText } from './sheets.jsx'
 import { IconCheck, IconX, IconPlus, IconChevron, IconChat } from './icons.jsx'
 
 const SEEN_KEY = 'mesaje-vazute'
-const itemAisle = (i) => i.aisle || guessAisle(i.name)
+const itemAisle = (i, aisles) => aisleIn(aisles, i.aisle || guessAisle(i.name, aisles))
 
 export function ListView({ list, user }) {
   const toast = useToast()
@@ -27,6 +28,7 @@ export function ListView({ list, user }) {
   useEffect(() => api.watchProducts(list.id, setProducts), [list.id])
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
+  const aisles = listAisles(list)
 
   if (!items) return <div className="center muted">Se încarcă…</div>
 
@@ -51,7 +53,8 @@ export function ListView({ list, user }) {
     const dup = pending.find((i) => normalize(i.name) === normalize(n))
     if (dup) { toast(`„${dup.name}” e deja pe listă`); return false }
     const known = productMap.get(productKey(n))
-    api.addItem(list.id, user, { name: n, quantity, aisle: known?.aisle || guessAisle(n) })
+    const aisle = known?.aisle && aisles.some((a) => a.id === known.aisle) ? known.aisle : guessAisle(n, aisles)
+    api.addItem(list.id, user, { name: n, quantity, aisle })
     return true
   }
 
@@ -86,12 +89,13 @@ export function ListView({ list, user }) {
   )
 
   const groups = prefs.groupByAisle
-    ? AISLES.map((a) => ({ aisle: a, items: pending.filter((i) => itemAisle(i) === a.id) })).filter((g) => g.items.length)
+    ? aisles.map((a) => ({ aisle: a, items: pending.filter((i) => itemAisle(i, aisles) === a.id) })).filter((g) => g.items.length)
     : null
 
   return (
     <main className="list">
       <AddForm onAdd={add} products={products} pending={pending} enabled={prefs.suggestions} />
+      <ShopMode list={list} user={user} pendingCount={pending.length} />
 
       {pending.length === 0 ? (
         <p className="center muted pad">{done.length ? 'Gata, totul e rezolvat!' : 'Lista e goală. Adaugă primul produs mai sus.'}</p>
@@ -123,7 +127,7 @@ export function ListView({ list, user }) {
           onPick={(reason, text) => { change(skipping, 'skipped', reason, text); setSkipping(null) }} />
       )}
       {editing && (
-        <EditSheet list={list} item={editing} onClose={() => setEditingId(null)} onChat={() => openChat(editing)} />
+        <EditSheet list={list} aisles={aisles} item={editing} onClose={() => setEditingId(null)} onChat={() => openChat(editing)} />
       )}
       {chatting && <ChatSheet list={list} item={chatting} user={user} onClose={closeChat} />}
     </main>
@@ -233,11 +237,11 @@ function SkipSheet({ item, onPick, onClose }) {
   )
 }
 
-function EditSheet({ list, item, onClose, onChat }) {
+function EditSheet({ list, aisles, item, onClose, onChat }) {
   const [name, setName] = useState(item.name)
   const [qty, setQty] = useState(item.quantity || '')
   const [note, setNote] = useState(item.note || '')
-  const [aisle, setAisle] = useState(itemAisle(item))
+  const [aisle, setAisle] = useState(itemAisle(item, aisles))
 
   function save(e) {
     e.preventDefault()
@@ -260,7 +264,7 @@ function EditSheet({ list, item, onClose, onChat }) {
           <label className="grow">Cantitate<input value={qty} onChange={(e) => setQty(e.target.value)} maxLength={20} placeholder="ex. 2 buc" /></label>
           <label className="grow">Raion
             <select value={aisle} onChange={(e) => setAisle(e.target.value)}>
-              {AISLES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
+              {aisles.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
             </select>
           </label>
         </div>
@@ -278,5 +282,82 @@ function EditSheet({ list, item, onClose, onChat }) {
         </div>
       </form>
     </Sheet>
+  )
+}
+
+// ---------- Mod magazin: ecranul rămâne aprins, doar la cerere ----------
+// Telefonul eliberează singur ecranul când aplicația trece în fundal sau blochezi telefonul.
+// În plus, modul se oprește singur după 10 minute fără nicio atingere și când lista e gata,
+// ca să nu se descarce bateria dacă telefonul ajunge în buzunar cu aplicația deschisă.
+
+const IDLE_MS = 10 * 60 * 1000
+
+function ShopMode({ list, user, pendingCount }) {
+  const toast = useToast()
+  const [on, setOn] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!on) return
+    let lock = null
+    let last = Date.now()
+    let timer
+    const stop = (msg) => { setOn(false); if (msg) toast(msg) }
+    const acquire = async () => {
+      try { if (document.visibilityState === 'visible') lock = await navigator.wakeLock.request('screen') } catch { /* refuzat */ }
+    }
+    const arm = () => {
+      last = Date.now()
+      clearTimeout(timer)
+      timer = setTimeout(() => stop('Mod magazin oprit după 10 minute fără activitate'), IDLE_MS)
+    }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - last > IDLE_MS) stop('Mod magazin oprit după 10 minute fără activitate')
+      else acquire()
+    }
+    acquire()
+    arm()
+    document.addEventListener('visibilitychange', onVisible)
+    document.addEventListener('pointerdown', arm)
+    document.addEventListener('keydown', arm)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      document.removeEventListener('pointerdown', arm)
+      document.removeEventListener('keydown', arm)
+      lock?.release().catch(() => {})
+    }
+  }, [on, toast])
+
+  useEffect(() => {
+    if (on && pendingCount === 0) { setOn(false); toast('Lista e gata: mod magazin oprit') }
+  }, [on, pendingCount, toast])
+
+  function start() {
+    if (!('wakeLock' in navigator)) { toast('Telefonul ăsta nu permite ținerea ecranului aprins din aplicație'); return }
+    setOn(true)
+  }
+
+  async function announceShop() {
+    setBusy(true)
+    const res = await sendAnnounce(list.id, atShopText(user), toast)
+    setBusy(false)
+    if (!res.ok) toast(res.error)
+  }
+
+  if (!on) {
+    return pendingCount > 0 ? (
+      <button className="shop-start" onClick={start}>🛒 Mod magazin <span className="muted small">ecranul rămâne aprins</span></button>
+    ) : null
+  }
+  return (
+    <div className="shop-bar" role="status">
+      <span className="grow">🛒 Mod magazin: ecranul rămâne aprins</span>
+      {list.memberEmails.length > 1 && (
+        <button className="btn small" disabled={busy} onClick={announceShop}>Anunță că sunt aici</button>
+      )}
+      <button className="btn small" onClick={() => setOn(false)}>Oprește</button>
+    </div>
   )
 }

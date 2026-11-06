@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
 import { ToastHost, useToast, errText, store } from './ui.jsx'
 import { ListView } from './ListView.jsx'
-import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet } from './sheets.jsx'
+import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
@@ -162,6 +162,8 @@ function Home({ user, admin }) {
       {sheet === 'settings' && <SettingsSheet user={user} onClose={close} />}
       {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} onClose={close} />}
       {sheet === 'admin' && admin && <AdminSheet user={user} onClose={close} />}
+      {sheet === 'aisles' && current && <AislesSheet list={current} onClose={close} />}
+      {sheet === 'history' && current && <HistorySheet list={current} user={user} onClose={close} />}
     </div>
   )
 }

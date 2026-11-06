@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
 import { THEMES, FONTS, usePrefs, setPref } from './prefs.js'
 import { relTime } from './time.js'
-import { Sheet, Switch, firstName, useToast, errText, store } from './ui.jsx'
+import { Sheet, Switch, firstName, useToast, errText, announceErrText, store } from './ui.jsx'
 import { sessionSummary } from './data/shared.js'
 import { IconUp, IconChevron } from './icons.jsx'
 import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
+import { AISLES, DEFAULT_AISLE, listAisles, guessAisle, normalize } from './aisles.js'
+import { reasonLabel } from './config.js'
 
 const people = (n) => (n > 1 ? `${n} persoane` : 'doar tu')
 const products = (n = 0) => (n === 1 ? '1 produs' : `${n} produse`)
@@ -53,6 +55,8 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
             <input value={rename} onChange={(e) => setRename(e.target.value)} maxLength={60} aria-label="Numele listei" />
             <button className="btn" disabled={!rename.trim() || rename.trim() === current.name}>Redenumește</button>
           </form>
+          <button className="btn wide" onClick={() => onOpen('aisles')}>Raioanele listei</button>
+          <button className="btn wide" onClick={() => onOpen('history')}>Istoric cumpărături</button>
           {canDelete && <button className="btn danger wide" onClick={del}>Șterge lista</button>}
         </>
       )}
@@ -328,19 +332,17 @@ export function AnnounceSheet({ list, user, onClose }) {
   const summary = items ? sessionSummary(items, user, since) : null
   const text = summary ? [summary.text, note.trim()].filter(Boolean).join('\n') : ''
 
-  async function send() {
+  const [err, setErr] = useState('')
+
+  async function send(message, remember) {
     setBusy(true)
-    try {
-      const r = await api.announce(list.id, text)
-      store.set(key, Date.now())
-      if (r.demo) toast('În modul demo nu se trimit notificări')
-      else if (r.phones > 0) toast(r.withoutPhone.length ? `Trimis. Fără notificări pornite: ${r.withoutPhone.join(', ')}` : 'Anunț trimis')
-      else toast('Nimeni din listă nu are notificările pornite încă')
-      onClose()
-    } catch (e) {
-      toast(errText(e))
-    }
+    setErr('')
+    const res = await sendAnnounce(list.id, message, toast)
     setBusy(false)
+    if (res.ok) {
+      if (remember) store.set(key, Date.now())
+      onClose()
+    } else setErr(res.error) // fereastra rămâne deschisă, ca să poți încerca din nou
   }
 
   return (
@@ -357,11 +359,171 @@ export function AnnounceSheet({ list, user, onClose }) {
           </div>
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={150}
             placeholder="Mesaj opțional, ex. Am luat tot, mai lipsește pâinea" aria-label="Mesaj opțional" />
-          <button className="btn primary wide" disabled={busy || !summary} onClick={send}>
+          {err && <p className="error">{err}</p>}
+          <button className="btn primary wide" disabled={busy || !summary} onClick={() => send(text, true)}>
             {busy ? 'Se trimite…' : 'Trimite anunțul'}
+          </button>
+          <button className="btn wide" disabled={busy} onClick={() => send(atShopText(user), false)}>
+            Anunță doar că sunt la magazin
           </button>
         </>
       )}
+    </Sheet>
+  )
+}
+
+export const atShopText = (user) => `${firstName(user.name)} e la magazin. Dacă mai lipsește ceva, adaugă acum în listă.`
+
+// Trimite un anunț și arată rezultatul. Întoarce { ok } sau { ok: false, error } (mesaj clar că n-a plecat).
+export async function sendAnnounce(listId, text, toast) {
+  try {
+    const r = await api.announce(listId, text)
+    if (r.demo) toast('În modul demo nu se trimit notificări')
+    else if (r.phones > 0) toast(r.withoutPhone.length ? `Trimis. Fără notificări pornite: ${r.withoutPhone.join(', ')}` : 'Anunț trimis')
+    else toast('Anunțul n-a ajuns la nimeni: nimeni din listă nu are notificările pornite')
+    return { ok: true }
+  } catch (e) {
+    console.error(e)
+    return { ok: false, error: announceErrText(e) }
+  }
+}
+// ---------- Raioanele listei ----------
+
+const newAisleId = () => `r-${Math.random().toString(36).slice(2, 8)}`
+
+export function AislesSheet({ list, onClose }) {
+  const toast = useToast()
+  const [rows, setRows] = useState(() => listAisles(list).map((a) => ({ ...a, keywords: (a.keywords || []).join(', ') })))
+  const [newLabel, setNewLabel] = useState('')
+  const [newIcon, setNewIcon] = useState('🛒')
+
+  const edit = (i, patch) => setRows((r) => r.map((a, j) => (j === i ? { ...a, ...patch } : a)))
+  function move(i, dir) {
+    const j = i + dir
+    if (j < 0 || j >= rows.length) return
+    setRows((r) => { const n = [...r]; [n[i], n[j]] = [n[j], n[i]]; return n })
+  }
+  function remove(i) {
+    if (!window.confirm(`Ștergi raionul „${rows[i].label}”? Produsele din el trec la „Altele”.`)) return
+    setRows((r) => r.filter((_, j) => j !== i))
+  }
+  function add(e) {
+    e.preventDefault()
+    if (!newLabel.trim()) return
+    // Raioanele noi apar înainte de „Altele”.
+    const at = rows.findIndex((a) => a.id === DEFAULT_AISLE)
+    const row = { id: newAisleId(), label: newLabel.trim(), icon: newIcon.trim() || '🛒', keywords: '' }
+    setRows((r) => (at === -1 ? [...r, row] : [...r.slice(0, at), row, ...r.slice(at)]))
+    setNewLabel('')
+  }
+  function save() {
+    if (rows.some((a) => !a.label.trim())) { toast('Fiecare raion trebuie să aibă un nume'); return }
+    const aisles = rows.map((a) => {
+      const keywords = a.keywords.split(',').map((k) => k.trim()).filter(Boolean).slice(0, 30)
+      return { id: a.id, label: a.label.trim().slice(0, 40), icon: (a.icon.trim() || '🛒').slice(0, 8), ...(keywords.length ? { keywords } : {}) }
+    })
+    api.setListAisles(list.id, aisles)
+    toast('Raioanele au fost salvate')
+    onClose()
+  }
+  function reset() {
+    if (!window.confirm('Revii la cele 14 raioane implicite? Raioanele adăugate de voi se pierd.')) return
+    setRows(AISLES.map((a) => ({ ...a, keywords: '' })))
+  }
+
+  return (
+    <Sheet title={`Raioanele din „${list.name}”`} onClose={onClose}>
+      <p className="muted small">Pune-le în ordinea în care treci prin magazin. Modificările se văd la toți cei din listă.</p>
+      <ul className="aisle-edit">
+        {rows.map((a, i) => (
+          <li key={a.id}>
+            <div className="row tight">
+              <input className="emoji-in" value={a.icon} onChange={(e) => edit(i, { icon: e.target.value })} aria-label="Emoji" maxLength={8} />
+              <input className="grow" value={a.label} onChange={(e) => edit(i, { label: e.target.value })} aria-label="Numele raionului" maxLength={40} />
+              <div className="order-btns">
+                <button type="button" className="icon-btn sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Mută „${a.label}” mai sus`}><IconUp /></button>
+                <button type="button" className="icon-btn sm" disabled={i === rows.length - 1} onClick={() => move(i, 1)} aria-label={`Mută „${a.label}” mai jos`}><IconChevron /></button>
+              </div>
+            </div>
+            <div className="row tight">
+              <input className="grow small-in" value={a.keywords} onChange={(e) => edit(i, { keywords: e.target.value })}
+                placeholder="Cuvinte-cheie (opțional), ex. nutella, pufuleți" aria-label={`Cuvinte-cheie pentru „${a.label}”`} />
+              {a.id !== DEFAULT_AISLE && <button type="button" className="btn small danger" onClick={() => remove(i)}>Șterge</button>}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <form className="row" onSubmit={add}>
+        <input className="emoji-in" value={newIcon} onChange={(e) => setNewIcon(e.target.value)} aria-label="Emoji pentru raionul nou" maxLength={8} />
+        <input className="grow" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Raion nou, ex. Bio" maxLength={40} />
+        <button className="btn" disabled={!newLabel.trim()}>Adaugă</button>
+      </form>
+      <p className="muted small">Cuvintele-cheie ajută la ghicit: un produs care începe cu unul dintre ele ajunge direct în raionul ăsta.</p>
+      <div className="row">
+        <button type="button" className="btn" onClick={reset}>Implicite</button>
+        <button type="button" className="btn primary grow" onClick={save}>Salvează</button>
+      </div>
+    </Sheet>
+  )
+}
+// ---------- Istoric cumpărături ----------
+
+const dayLabel = (ms) => {
+  const d = new Date(ms), today = new Date()
+  const y = new Date(); y.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Azi'
+  if (d.toDateString() === y.toDateString()) return 'Ieri'
+  return d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+export function HistorySheet({ list, user, onClose }) {
+  const toast = useToast()
+  const [history, setHistory] = useState(null)
+  const [pending, setPending] = useState([])
+  useEffect(() => api.watchHistory(list.id, setHistory, (e) => toast(errText(e))), [list.id, toast])
+  useEffect(() => api.watchItems(list.id, (items) => setPending(items.filter((i) => i.status === 'pending')), () => {}), [list.id])
+
+  const aisles = listAisles(list)
+  const onList = new Set(pending.map((i) => normalize(i.name)))
+
+  function readd(item) {
+    const aisle = aisles.some((a) => a.id === item.aisle) ? item.aisle : guessAisle(item.name, aisles)
+    api.addItem(list.id, user, { name: item.name, quantity: item.quantity || '', note: item.note || '', aisle })
+    toast(`„${item.name}” e din nou pe listă`)
+  }
+
+  const days = []
+  for (const it of history || []) {
+    const label = it.resolvedAt ? dayLabel(it.resolvedAt) : 'Fără dată'
+    if (days.at(-1)?.label !== label) days.push({ label, items: [] })
+    days.at(-1).items.push(it)
+  }
+
+  return (
+    <Sheet title={`Istoric: ${list.name}`} onClose={onClose}>
+      {history === null && <p className="center muted">Se încarcă…</p>}
+      {history?.length === 0 && <p className="muted">Încă nimic aici. Produsele apar în istoric după „Golește rezolvatele”.</p>}
+      {days.map((d) => (
+        <section key={d.label}>
+          <h3>{d.label}</h3>
+          <ul className="members">
+            {d.items.map((it) => (
+              <li key={it.id}>
+                <span className="grow">
+                  {it.name}{it.quantity && <span className="muted"> · {it.quantity}</span>}
+                  <span className="muted small block">
+                    {it.status === 'bought' ? `cumpărat de ${firstName(it.resolvedBy?.name)}` : `${reasonLabel(it)} · ${firstName(it.resolvedBy?.name)}`}
+                  </span>
+                </span>
+                {onList.has(normalize(it.name))
+                  ? <span className="muted small">pe listă</span>
+                  : <button className="btn small" onClick={() => readd(it)}>Adaugă</button>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {history?.length === 200 && <p className="muted small">Se văd ultimele 200 de produse.</p>}
     </Sheet>
   )
 }

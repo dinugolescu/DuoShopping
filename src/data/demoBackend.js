@@ -105,6 +105,10 @@ export async function deleteList(listId) {
   })
 }
 
+export function setListAisles(listId, aisles) {
+  mutate((db) => { db.lists[listId].aisles = aisles })
+}
+
 export function invite(list, user, email) {
   const e = normEmail(email)
   mutate((db) => {
@@ -182,10 +186,19 @@ export function setStatus(listId, itemId, user, status, reason = null, reasonTex
 export function finishTrip(listId, items) {
   mutate((db) => {
     const changes = finishTripChanges(items)
-    for (const { id, patch } of changes) Object.assign(db.items[listId][id], patch)
+    for (const { id, patch, archive } of changes) {
+      Object.assign(db.items[listId][id], patch)
+      // Pozele din discuția produselor arhivate se șterg; textul rămâne.
+      if (archive) for (const m of Object.values(db.messages[id] || {})) if (m.photo) Object.assign(m, { photo: null, photoDeleted: true })
+    }
     const archived = changes.filter((c) => c.archive).length
     db.lists[listId].itemCount = Math.max(0, (db.lists[listId].itemCount || 0) - archived)
   })
+}
+
+export function watchHistory(listId, cb) {
+  return watch((db) => Object.values(db.items[listId] || {}).filter((i) => i.archived)
+    .sort((a, b) => (b.resolvedAt ?? 0) - (a.resolvedAt ?? 0)).slice(0, 200), cb)
 }
 
 export function watchProducts(listId, cb) {

@@ -22,6 +22,14 @@ export function errText(e) {
   return 'Ceva n-a mers: ' + (e?.message || e)
 }
 
+// Eroare la trimiterea unui anunț: spunem limpede că n-a plecat.
+export function announceErrText(e) {
+  const code = e?.code || ''
+  const offline = !navigator.onLine || ['functions/unavailable', 'functions/internal', 'functions/deadline-exceeded'].includes(code)
+  if (offline) return 'Anunțul n-a plecat: nu e conexiune la internet. Încearcă din nou când ai semnal.'
+  return `Anunțul n-a plecat. ${errText(e) || ''}`.trim()
+}
+
 // Re-randează periodic, ca „azi la…” să devină „ieri la…” fără reîncărcare.
 export function useNow(intervalMs = 60000) {
   const [now, setNow] = useState(Date.now())
@@ -59,9 +67,46 @@ export function ToastHost({ children }) {
   )
 }
 
+// ---------- Butonul Back (Android) închide fereastra de deasupra, nu aplicația ----------
+// Cât timp e deschisă cel puțin o fereastră, ținem o singură intrare în plus în istoricul
+// browserului („paznicul”). Back o consumă: închidem fereastra de deasupra și, dacă mai rămân
+// altele deschise, punem paznicul la loc. Dacă ultima fereastră se închide din buton (X, fundal),
+// scoatem noi paznicul. Verificarea se face după un moment, ca la trecerea dintr-o fereastră
+// în alta paznicul să rămână pe loc.
+
+const layers = []
+let guard = false
+let ignorePops = 0
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    if (ignorePops > 0) { ignorePops--; return }
+    guard = false
+    layers.pop()?.close()
+    if (layers.length) { window.history.pushState({ strat: true }, ''); guard = true }
+  })
+}
+
+export function useBackClose(onClose) {
+  const ref = useRef(onClose)
+  ref.current = onClose
+  useEffect(() => {
+    const layer = { close: () => ref.current() }
+    layers.push(layer)
+    if (!guard) { window.history.pushState({ strat: true }, ''); guard = true }
+    return () => {
+      const i = layers.indexOf(layer)
+      if (i !== -1) layers.splice(i, 1)
+      setTimeout(() => {
+        if (!layers.length && guard) { guard = false; ignorePops++; window.history.back() }
+      }, 0)
+    }
+  }, [])
+}
+
 // ---------- Fereastră de jos ----------
 
 export function Sheet({ title, onClose, children, className = '' }) {
+  useBackClose(onClose)
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)

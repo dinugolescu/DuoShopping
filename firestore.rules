@@ -62,7 +62,8 @@ service cloud.firestore {
         return isMember(list()) || isAdmin();
       }
       function validList(l) {
-        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt'])
+        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles'])
+          && (!('aisles' in l) || (l.aisles is list && l.aisles.size() <= 40))
           && l.name is string && l.name.size() > 0 && l.name.size() <= 60
           && l.memberEmails is list && l.memberEmails.size() <= 30
           && l.ownerEmail in l.memberEmails;
@@ -118,9 +119,12 @@ service cloud.firestore {
             && request.resource.data.text is string && request.resource.data.text.size() <= 1000
             && (request.resource.data.photo == null
                 || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
-          // Reacțiile: oricine din listă le poate modifica, dar nimic altceva din mesaj.
+          // Reacțiile: oricine din listă le poate modifica. În rest, se poate doar șterge poza
+          // (la „Golește rezolvatele”, pentru produsele arhivate); textul rămâne neatins.
           allow update: if isMember(list())
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+            && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+                || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo', 'photoDeleted'])
+                    && request.resource.data.photo == null && request.resource.data.photoDeleted == true));
         }
       }
     }

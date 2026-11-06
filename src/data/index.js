@@ -7,9 +7,9 @@ const backend = isDemo ? await import('./demoBackend.js') : await import('./fire
 export const DEMO_USERS = backend.DEMO_USERS ?? []
 export const {
   onUser, signIn, signOut, watchAccess, setWriteErrorHandler,
-  watchLists, createList, renameList, deleteList, invite, removeMember, leaveList,
+  watchLists, createList, renameList, setListAisles, deleteList, invite, removeMember, leaveList,
   watchItems, addItem, updateItem, setItemAisle, deleteItem, setStatus, finishTrip,
-  watchProducts,
+  watchProducts, watchHistory,
   watchMessages, sendMessage, toggleReaction, deleteMessage,
   watchAllLists, watchAllowed, revokeAccess,
   pushStatus, enablePush, disablePush, announce,

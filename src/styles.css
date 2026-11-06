@@ -438,3 +438,19 @@ div.center { padding: 48px 16px; }
   border: 1px solid var(--line); border-radius: 14px; background: var(--bg); white-space: pre-wrap;
 }
 .announce-preview + input { width: 100%; margin-bottom: 10px; }
+
+/* Editarea raioanelor */
+.aisle-edit { list-style: none; padding: 0; margin: 8px 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.aisle-edit li { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+.emoji-in { width: 52px; flex: none; text-align: center; font-size: 20px; padding-left: 4px; padding-right: 4px; }
+.small-in { font-size: 14px; }
+
+/* Mod magazin */
+.shop-start {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin: 10px 0 0; padding: 8px 12px;
+  border: 1px dashed var(--line); border-radius: 12px; background: none; color: var(--text); font: inherit; cursor: pointer;
+}
+.shop-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; padding: 10px 12px;
+  border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent);
+}

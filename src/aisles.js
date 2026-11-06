@@ -133,9 +133,33 @@ for (const [aisle, words] of Object.entries(WORDS)) {
 STEMS.sort((a, b) => b[0].length - a[0].length)
 const PHRASE_LIST = Object.entries(PHRASES).sort((a, b) => b[0].length - a[0].length)
 
-export function guessAisle(name) {
+// Raioanele unei liste: cele salvate pe listă (editate de voi) sau cele implicite.
+// „Altele” există mereu, la final, ca să aibă unde ajunge produsele fără raion.
+export function listAisles(list) {
+  const own = Array.isArray(list?.aisles) && list.aisles.length ? list.aisles : AISLES
+  return own.some((a) => a.id === DEFAULT_AISLE) ? own : [...own, AISLES[AISLES.length - 1]]
+}
+
+// Raionul în care apare un produs: cel ales/ghicit, dacă mai există în listă; altfel „Altele”.
+export function aisleIn(aisles, id) {
+  return aisles.some((a) => a.id === id) ? id : DEFAULT_AISLE
+}
+
+// Ghicitul ține cont de raioanele listei: întâi cuvintele-cheie ale raioanelor voastre,
+// apoi dicționarul de mai sus (dacă raionul ghicit a fost șters, produsul ajunge la „Altele”).
+export function guessAisle(name, aisles = AISLES) {
   const n = normalize(name)
   if (!n) return DEFAULT_AISLE
+  for (const a of aisles) {
+    for (const k of a.keywords || []) {
+      const kw = normalize(k)
+      if (kw && (` ${n} `.includes(` ${kw} `) || (kw.length >= 3 && n.split(' ').some((w) => w.startsWith(kw))))) return a.id
+    }
+  }
+  return aisleIn(aisles, guessDefault(n))
+}
+
+function guessDefault(n) {
   const padded = ` ${n} `
   for (const [p, aisle] of PHRASE_LIST) if (padded.includes(` ${p}`)) return aisle
   for (const word of n.split(' ')) {

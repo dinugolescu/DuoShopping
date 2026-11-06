@@ -5,7 +5,7 @@ import {
 } from 'firebase/auth'
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy,
+  collection, doc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, limit,
   serverTimestamp, arrayUnion, arrayRemove, increment, writeBatch, FieldPath,
 } from 'firebase/firestore'
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
@@ -136,6 +136,10 @@ export function renameList(listId, name) {
   fire(updateDoc(listDoc(listId), { name: name.trim() }))
 }
 
+export function setListAisles(listId, aisles) {
+  fire(updateDoc(listDoc(listId), { aisles }))
+}
+
 export async function deleteList(listId) {
   const items = await getDocs(itemsCol(listId))
   const refs = []
@@ -225,6 +229,28 @@ export function finishTrip(listId, items) {
   const archived = changes.filter((c) => c.archive).length
   if (archived) b.update(listDoc(listId), { itemCount: increment(-archived) })
   fire(b.commit())
+  // Pozele din discuția produselor arhivate se șterg (ocupă cel mai mult); textul mesajelor rămâne.
+  const withChat = items.filter((i) => i.msgCount > 0 && changes.some((c) => c.id === i.id && c.archive))
+  if (withChat.length) fire(dropPhotos(listId, withChat))
+}
+
+async function dropPhotos(listId, items) {
+  const refs = []
+  for (const it of items) {
+    const msgs = await getDocs(msgsCol(listId, it.id))
+    refs.push(...msgs.docs.filter((m) => m.get('photo')).map((m) => m.ref))
+  }
+  for (let i = 0; i < refs.length; i += 450) {
+    const b = writeBatch(db)
+    refs.slice(i, i + 450).forEach((r) => b.update(r, { photo: null, photoDeleted: true }))
+    await b.commit()
+  }
+}
+
+// Istoricul: produsele arhivate, cele mai recente întâi (are nevoie de indexul din firestore.indexes.json).
+export function watchHistory(listId, cb, onError) {
+  const q = query(itemsCol(listId), where('archived', '==', true), orderBy('resolvedAt', 'desc'), limit(200))
+  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
 }
 
 export function watchProducts(listId, cb) {

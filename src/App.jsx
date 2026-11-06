@@ -6,7 +6,7 @@ import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, Aisles
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
-import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips } from './onboarding.jsx'
+import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt } from './onboarding.jsx'
 
 export default function App() {
   return (
@@ -156,6 +156,7 @@ function Home({ user, admin }) {
       </header>
 
       <InstallBanner onOpen={() => setSheet('install')} />
+      {current && <PushPrompt user={user} />}
       {current && <Tips />}
       {current
         ? <ListView key={current.id} list={current} user={user} />

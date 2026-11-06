@@ -5,10 +5,9 @@ import { relTime } from './time.js'
 import { Sheet, Switch, firstName, useToast, errText, announceErrText, store } from './ui.jsx'
 import { sessionSummary } from './data/shared.js'
 import { IconUp, IconChevron } from './icons.jsx'
-import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 import { AISLES, DEFAULT_AISLE, listAisles, guessAisle, normalize } from './aisles.js'
 import { reasonLabel } from './config.js'
-import { InviteShare, isInstalled } from './onboarding.jsx'
+import { InviteShare, isInstalled, IconPicker } from './onboarding.jsx'
 
 const people = (n) => (n > 1 ? `${n} persoane` : 'doar tu')
 const products = (n = 0) => (n === 1 ? '1 produs' : `${n} produse`)
@@ -164,26 +163,7 @@ export function SettingsSheet({ user, onClose }) {
   return (
     <Sheet title="Setări și aspect" onClose={onClose}>
       <h3>Iconița aplicației</h3>
-      <div className="icon-grid" role="radiogroup" aria-label="Desenul iconiței">
-        {ICON_DESIGNS.map((d) => (
-          <button key={d.id} role="radio" aria-checked={prefs.icon === d.id}
-            className={`icon-pick ${prefs.icon === d.id ? 'active' : ''}`} onClick={() => setPref('icon', d.id)}>
-            <img src={iconDataUrl(d.id, prefs.iconColor)} alt="" />
-            <span>{d.label}</span>
-          </button>
-        ))}
-      </div>
-      <div className="swatches" role="radiogroup" aria-label="Culoarea iconiței">
-        {ICON_COLORS.map((c) => (
-          <button key={c.id} role="radio" aria-checked={prefs.iconColor === c.id} aria-label={c.label} title={c.label}
-            className={`swatch ${prefs.iconColor === c.id ? 'active' : ''}`} style={{ background: c.bg }}
-            onClick={() => setPref('iconColor', c.id)} />
-        ))}
-      </div>
-      <p className="muted small">
-        Pe iPhone, iconița nouă apare după ce adaugi din nou aplicația pe ecran (Share → Add to Home Screen).
-        Pe Android se poate actualiza singură în cel mult o zi; dacă nu, dezinstalează și instalează din nou.
-      </p>
+      <IconPicker />
 
       <PushSettings user={user} />
 

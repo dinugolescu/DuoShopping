@@ -2,7 +2,9 @@
 // pe ecranul principal, avertismentul pentru browserele din aplicații și sfaturile de început.
 import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
-import { Sheet, store, useToast, firstName } from './ui.jsx'
+import { Sheet, store, useToast, firstName, errText } from './ui.jsx'
+import { usePrefs, setPref } from './prefs.js'
+import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 
 // Adresa pe care o trimitem în invitații (VITE_APP_URL, altfel adresa curentă).
 export const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin
@@ -134,6 +136,13 @@ export function InstallSheet({ onClose }) {
       <p className="muted small">
         Instalată, DuoShopping se deschide pe tot ecranul, ca o aplicație obișnuită, și poate primi notificări.
       </p>
+      {!isInstalled() && !device.inApp && device.mobile && (
+        <>
+          <h3>Alege întâi iconița</h3>
+          <IconPicker />
+          <h3>Apoi</h3>
+        </>
+      )}
       {isInstalled() ? (
         <p>Aplicația e deja instalată pe acest telefon.</p>
       ) : device.inApp ? (
@@ -144,6 +153,7 @@ export function InstallSheet({ onClose }) {
           <li>Apasă butonul <b>Partajează</b> (pătratul cu săgeata în sus{device.iosOtherBrowser ? ', din bara de adresă' : ', jos în mijloc'}).</li>
           <li>Derulează și alege <b>„Adaugă pe ecranul principal”</b>.</li>
           <li>Apasă <b>„Adaugă”</b>, apoi deschide DuoShopping de pe ecran, nu din browser.</li>
+          <li>Acolo intri din nou cu Google și pornești notificările: aplicația de pe ecran nu le preia din Safari.</li>
         </ol>
       ) : prompt ? (
         <button className="btn primary wide" onClick={install}>Instalează DuoShopping</button>
@@ -195,7 +205,7 @@ export function InstallBanner({ onOpen }) {
   if (hidden || isInstalled() || !device.mobile) return null
   return (
     <div className="hint-bar">
-      <button className="grow hint-main" onClick={onOpen}>📲 Pune DuoShopping pe ecranul principal</button>
+      <button className="grow hint-main" onClick={onOpen}>📲 Pune DuoShopping pe ecran{device.ios ? ', ca să primești notificări' : ''}</button>
       <button className="btn small" onClick={() => { store.set(INSTALL_HIDE_KEY, true); setHidden(true) }}>Nu acum</button>
     </div>
   )
@@ -217,6 +227,81 @@ export function Tips() {
         <li><span aria-hidden="true">☰</span> Din meniu pui raioanele în ordinea magazinului tău și vezi istoricul.</li>
       </ul>
       <button className="btn small" onClick={() => { store.set(TIPS_KEY, true); setSeen(true) }}>Am înțeles</button>
+    </section>
+  )
+}
+
+// ---------- Alegerea iconiței ----------
+// iPhone-ul ia iconița o singură dată, când adaugi aplicația pe ecran; după aceea nu o mai schimbă.
+
+export function IconPicker() {
+  const prefs = usePrefs()
+  if (device.ios && isInstalled()) {
+    return (
+      <p className="muted small">
+        Pe iPhone, iconița de pe ecran rămâne cea aleasă la adăugare. Ca s-o schimbi: șterge iconița de pe ecran,
+        deschide {APP_URL} în Safari, alege iconița din ☰ → Setări și aspect, apoi adaug-o din nou pe ecran.
+        După readăugare intri din nou cu Google și pornești din nou notificările.
+      </p>
+    )
+  }
+  return (
+    <>
+      <div className="icon-grid" role="radiogroup" aria-label="Desenul iconiței">
+        {ICON_DESIGNS.map((d) => (
+          <button key={d.id} role="radio" aria-checked={prefs.icon === d.id}
+            className={`icon-pick ${prefs.icon === d.id ? 'active' : ''}`} onClick={() => setPref('icon', d.id)}>
+            <img src={iconDataUrl(d.id, prefs.iconColor)} alt="" />
+            <span>{d.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="swatches" role="radiogroup" aria-label="Culoarea iconiței">
+        {ICON_COLORS.map((c) => (
+          <button key={c.id} role="radio" aria-checked={prefs.iconColor === c.id} aria-label={c.label} title={c.label}
+            className={`swatch ${prefs.iconColor === c.id ? 'active' : ''}`} style={{ background: c.bg }}
+            onClick={() => setPref('iconColor', c.id)} />
+        ))}
+      </div>
+      <p className="muted small">
+        {device.ios
+          ? 'Pe iPhone, iconița se fixează când adaugi aplicația pe ecran, așa că alege-o înainte.'
+          : isInstalled()
+            ? 'Pe Android, iconița de pe ecran se poate actualiza singură în cel mult o zi; dacă nu, dezinstalează și instalează din nou.'
+            : 'Iconița aleasă aici apare pe ecran când instalezi aplicația.'}
+      </p>
+    </>
+  )
+}
+
+// ---------- Îndemn la notificări ----------
+// Fără notificări, celălalt nu află când ai terminat lista sau când ești la magazin.
+
+const PUSH_HIDE_KEY = 'ascunde-notificari'
+export function PushPrompt({ user }) {
+  const toast = useToast()
+  const [status, setStatus] = useState(() => api.pushStatus())
+  const [hidden, setHidden] = useState(() => store.get(PUSH_HIDE_KEY, false))
+  const [busy, setBusy] = useState(false)
+  if (hidden || status !== 'off') return null
+
+  async function enable() {
+    setBusy(true)
+    try { await api.enablePush(user); toast('Notificările sunt pornite pe acest telefon') } catch (e) { toast(errText(e)) }
+    setStatus(api.pushStatus())
+    setBusy(false)
+  }
+
+  return (
+    <section className="tips push-prompt">
+      <h3>🔔 Pornește notificările</h3>
+      <p className="small">
+        Așa afli când celălalt a terminat de completat lista sau a ajuns la magazin. Fără ele, DuoShopping e doar o listă.
+      </p>
+      <div className="row">
+        <button className="btn primary small" disabled={busy} onClick={enable}>Pornește</button>
+        <button className="btn small" onClick={() => { store.set(PUSH_HIDE_KEY, true); setHidden(true) }}>Nu acum</button>
+      </div>
     </section>
   )
 }

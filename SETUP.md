@@ -1,4 +1,4 @@
-# Lista de cumpărături: punere în funcțiune
+# DuoShopping: punere în funcțiune
 
 Aplicația e o PWA (aplicație web instalabilă) cu React + Vite, cu Firebase pentru login Google și baza de date.
 Planul gratuit Firebase (Spark) e mai mult decât suficient pentru o familie.
@@ -10,7 +10,7 @@ npm install
 npm run demo
 ```
 
-Deschide http://localhost:5173. Datele stau doar în browser. Două taburi cu utilizatori demo diferiți simulează doi oameni care folosesc aceeași listă. Dinu e admin, iar Ana și Mihai intră doar după ce îi invită cineva.
+Deschide http://localhost:5173. Datele stau doar în browser. Două taburi cu utilizatori demo diferiți simulează doi oameni care folosesc aceeași listă. Dinu e admin, iar Moni, Andreea și Ștefan intră doar după ce îi invită cineva.
 
 ## 1. Creează proiectul Firebase
 

@@ -4,7 +4,8 @@ import { ToastHost, useToast, errText, store } from './ui.jsx'
 import { ListView } from './ListView.jsx'
 import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet } from './sheets.jsx'
 import { IconChevron, IconUsers } from './icons.jsx'
-import './prefs.js' // aplică tema și fontul salvate, înainte de primul ecran
+import { usePrefs } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
+import { iconDataUrl } from './appIcons.js'
 
 export default function App() {
   return (
@@ -45,13 +46,13 @@ function Login() {
   }
   return (
     <main className="login">
-      <img src="/icon.svg" alt="" className="login-logo" />
-      <h1>Lista de cumpărături</h1>
-      <p className="muted">O listă comună, sincronizată pe toate telefoanele.</p>
+      <Logo />
+      <h1>DuoShopping</h1>
+      <p className="muted">Lista de cumpărături comună, sincronizată pe toate telefoanele.</p>
       {api.isDemo ? (
         <>
           <p className="demo-note">
-            Mod demo: datele stau doar în acest browser. Dinu e admin; Ana și Mihai intră doar după ce îi invită cineva.
+            Mod demo: datele stau doar în acest browser. Dinu e admin; Moni, Andreea și Ștefan intră doar după ce îi invită cineva.
             Deschide mai multe taburi ca să vezi sincronizarea.
           </p>
           {api.DEMO_USERS.map((u, i) => (
@@ -70,10 +71,15 @@ function Login() {
   )
 }
 
+function Logo() {
+  const p = usePrefs()
+  return <img src={iconDataUrl(p.icon, p.iconColor)} alt="" className="login-logo" />
+}
+
 function NoAccess({ user }) {
   return (
     <main className="login">
-      <img src="/icon.svg" alt="" className="login-logo" />
+      <Logo />
       <h1>Încă nu ai acces</h1>
       <p className="muted">
         Roagă pe cineva care folosește deja aplicația să te invite într-o listă, pe adresa <b>{user.email}</b>.
@@ -122,7 +128,7 @@ function Home({ user, admin }) {
     <div className="app">
       <header className="top">
         <button className="list-switch" onClick={() => setSheet('menu')} aria-label="Alege lista">
-          <span className="list-title">{current ? current.name : 'Cumpărături'}</span>
+          <span className="list-title">{current ? current.name : 'DuoShopping'}</span>
           <IconChevron />
         </button>
         {current && (

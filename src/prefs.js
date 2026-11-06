@@ -1,5 +1,6 @@
 // Preferințe salvate pe fiecare telefon în parte (localStorage).
 import { useEffect, useState } from 'react'
+import { DEFAULT_ICON, iconDataUrl, iconKey } from './appIcons.js'
 
 export const THEMES = [
   { id: 'auto', label: 'Automat' },
@@ -15,7 +16,7 @@ export const FONTS = [
   { id: 'hand', label: 'Patrick Hand (scris de mână)', css: '"Patrick Hand", cursive', google: 'Patrick+Hand' },
 ]
 
-const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true }
+const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color }
 const KEY = 'cumparaturi-prefs'
 
 function load() {
@@ -53,6 +54,8 @@ function apply(p) {
     document.head.appendChild(link)
   }
 
+  applyIcon(p)
+
   // Culoarea barei de stare de pe telefon urmează tema efectivă.
   const dark = p.theme === 'dark' || (p.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#121513' : '#f5f6f2')
@@ -60,3 +63,25 @@ function apply(p) {
 
 apply(current)
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => apply(current))
+
+// Iconița aleasă: în tab, pentru „Add to Home Screen” pe iPhone și în manifestul citit de Android la instalare.
+function applyIcon(p) {
+  const key = iconKey(p.icon, p.iconColor)
+  const isDefault = key === iconKey(DEFAULT_ICON.design, DEFAULT_ICON.color)
+  link('icon').href = iconDataUrl(p.icon, p.iconColor)
+  link('apple-touch-icon').href = `/icons/${key}-apple.png`
+  // Manifestul implicit e cel generat la build; pentru celelalte combinații există fișiere separate.
+  const m = link('manifest')
+  if (!m.dataset.original) m.dataset.original = m.getAttribute('href') || '/manifest.webmanifest'
+  m.href = isDefault ? m.dataset.original : `/manifests/${key}.webmanifest`
+}
+
+function link(rel) {
+  let el = document.querySelector(`link[rel="${rel}"]`)
+  if (!el) {
+    el = document.createElement('link')
+    el.rel = rel
+    document.head.appendChild(el)
+  }
+  return el
+}

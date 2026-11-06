@@ -1,16 +1,17 @@
 // Variantă fără server: totul stă în localStorage. Taburile se sincronizează între ele,
 // așa că poți deschide două taburi cu utilizatori demo diferiți și vezi sincronizarea.
-// Dinu e administrator; Ana și Mihai nu au acces până nu sunt invitați.
+// Dinu e administrator; Moni, Andreea și Ștefan nu au acces până nu sunt invitați.
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
 import { productKey } from '../aisles.js'
 
 export const DEMO_USERS = [
-  { uid: 'demo-dinu', name: 'Dinu Demo', email: 'dinu@demo.ro', photo: null },
-  { uid: 'demo-ana', name: 'Ana Demo', email: 'ana@demo.ro', photo: null },
-  { uid: 'demo-mihai', name: 'Mihai Demo', email: 'mihai@demo.ro', photo: null },
+  { uid: 'demo-dinu', name: 'Dinu', email: 'dinu@demo.ro', photo: null },
+  { uid: 'demo-moni', name: 'Moni', email: 'moni@demo.ro', photo: null },
+  { uid: 'demo-andreea', name: 'Andreea', email: 'andreea@demo.ro', photo: null },
+  { uid: 'demo-stefan', name: 'Ștefan', email: 'stefan@demo.ro', photo: null },
 ]
 
-const DB_KEY = 'cumparaturi-demo-db-v2'
+const DB_KEY = 'cumparaturi-demo-db-v3'
 const USER_KEY = 'cumparaturi-demo-user' // sessionStorage: fiecare tab poate avea alt utilizator
 
 const empty = () => ({ lists: {}, items: {}, products: {}, messages: {}, allowed: {}, admins: { 'dinu@demo.ro': true } })

@@ -4,6 +4,7 @@ import { THEMES, FONTS, usePrefs, setPref } from './prefs.js'
 import { relTime } from './time.js'
 import { Sheet, Switch, firstName, useToast, errText } from './ui.jsx'
 import { IconUp, IconChevron } from './icons.jsx'
+import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 
 const people = (n) => (n > 1 ? `${n} persoane` : 'doar tu')
 const products = (n = 0) => (n === 1 ? '1 produs' : `${n} produse`)
@@ -106,7 +107,7 @@ export function ShareSheet({ list, user, admin, onClose }) {
   async function shareLink() {
     const url = window.location.origin
     try {
-      if (navigator.share) await navigator.share({ title: 'Lista de cumpărături', text: 'Intră cu contul Google ca să vezi lista noastră.', url })
+      if (navigator.share) await navigator.share({ title: 'DuoShopping', text: 'Intră cu contul Google ca să vezi lista noastră.', url })
       else { await navigator.clipboard.writeText(url); toast('Link copiat') }
     } catch { /* utilizatorul a renunțat */ }
   }
@@ -161,6 +162,28 @@ export function SettingsSheet({ onClose }) {
 
   return (
     <Sheet title="Setări și aspect" onClose={onClose}>
+      <h3>Iconița aplicației</h3>
+      <div className="icon-grid" role="radiogroup" aria-label="Desenul iconiței">
+        {ICON_DESIGNS.map((d) => (
+          <button key={d.id} role="radio" aria-checked={prefs.icon === d.id}
+            className={`icon-pick ${prefs.icon === d.id ? 'active' : ''}`} onClick={() => setPref('icon', d.id)}>
+            <img src={iconDataUrl(d.id, prefs.iconColor)} alt="" />
+            <span>{d.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="swatches" role="radiogroup" aria-label="Culoarea iconiței">
+        {ICON_COLORS.map((c) => (
+          <button key={c.id} role="radio" aria-checked={prefs.iconColor === c.id} aria-label={c.label} title={c.label}
+            className={`swatch ${prefs.iconColor === c.id ? 'active' : ''}`} style={{ background: c.bg }}
+            onClick={() => setPref('iconColor', c.id)} />
+        ))}
+      </div>
+      <p className="muted small">
+        Pe iPhone, iconița nouă apare după ce adaugi din nou aplicația pe ecran (Share → Add to Home Screen).
+        Pe Android se poate actualiza singură în cel mult o zi; dacă nu, dezinstalează și instalează din nou.
+      </p>
+
       <h3>Temă</h3>
       <div className="segmented" role="radiogroup" aria-label="Temă">
         {THEMES.map((t) => (

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
 import { ToastHost, useToast, errText, store } from './ui.jsx'
 import { ListView } from './ListView.jsx'
+import { GiftListView } from './GiftList.jsx'
+import { isGiftList, receivesIn } from './gifts.js'
 import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet, useAnnounce } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
@@ -143,7 +145,7 @@ function Home({ user, admin }) {
   }
 
   // După crearea unei liste întrebăm imediat cu cine o împarte.
-  const create = (name) => { setCurrentId(api.createList(user, name)); setSheet('share-new') }
+  const create = (name, kind) => { setCurrentId(api.createList(user, name, kind)); setSheet('share-new') }
   const close = () => setSheet(null)
 
   // Lista în care ești singur: scoatem în evidență invitarea, dacă n-ai spus că e personală.
@@ -152,7 +154,9 @@ function Home({ user, admin }) {
   const markPersonal = () => setPref('personalLists', [...personal.filter((id) => lists.some((l) => l.id === id)), current.id])
 
   // Câte lucruri ai făcut pe listă și n-ai anunțat (doar unde ai pe cine anunța).
-  const ann = useAnnounce(current, user)
+  // Cine primește cadouri nu anunță și nu vede ce s-a luat, deci nici clopoțelul.
+  const iReceive = receivesIn(current, user)
+  const ann = useAnnounce(iReceive ? null : current, user)
   const unannounced = current && current.memberEmails.length > 1 ? ann.pending?.length || 0 : 0
 
   if (!sorted) return <div className="center muted">{t('loadingLists')}</div>
@@ -164,7 +168,7 @@ function Home({ user, admin }) {
           <span className="list-title">{current ? current.name : 'DuoShopping'}</span>
           <IconChevron />
         </button>
-        {current && (
+        {current && !iReceive && (
           <button className="icon-btn" onClick={() => setSheet('announce')}
             aria-label={unannounced ? t('announceOthersN', unannounced) : t('announceOthers')}>
             <IconBell />
@@ -191,7 +195,9 @@ function Home({ user, admin }) {
       {current && tipsDone && <PushPrompt user={user} />}
       {current && !tipsDone && <Tips onDone={() => setTipsDone(true)} />}
       {current
-        ? <ListView key={current.id} list={current} user={user} />
+        ? isGiftList(current)
+          ? <GiftListView key={current.id} list={current} user={user} />
+          : <ListView key={current.id} list={current} user={user} />
         : <EmptyLists user={user} onCreate={create} onMenu={() => setSheet('menu')} />}
 
       {sheet === 'menu' && (

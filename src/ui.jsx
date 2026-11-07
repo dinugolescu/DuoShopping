@@ -52,10 +52,11 @@ export const useToast = () => useContext(ToastCtx)
 export function ToastHost({ children }) {
   const [toast, setToast] = useState(null)
   const timer = useRef()
-  const show = useCallback((text, undo) => {
+  // `undo`: acțiunea butonului din toast; `label`: textul lui (implicit „Anulează”).
+  const show = useCallback((text, undo, label) => {
     if (!text) return
     clearTimeout(timer.current)
-    setToast({ text, undo, key: Date.now() })
+    setToast({ text, undo, label, key: Date.now() })
     timer.current = setTimeout(() => setToast(null), undo ? 5000 : 3500)
   }, [])
   return (
@@ -64,7 +65,7 @@ export function ToastHost({ children }) {
       {toast && (
         <div className="toast" role="status" key={toast.key}>
           <span>{toast.text}</span>
-          {toast.undo && <button onClick={() => { toast.undo(); setToast(null) }}>{t('undo')}</button>}
+          {toast.undo && <button onClick={() => { toast.undo(); setToast(null) }}>{toast.label || t('undo')}</button>}
         </div>
       )}
     </ToastCtx.Provider>

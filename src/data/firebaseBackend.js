@@ -107,7 +107,11 @@ const listsCol = collection(db, 'lists')
 const listDoc = (id) => doc(db, 'lists', id)
 const itemsCol = (listId) => collection(db, 'lists', listId, 'items')
 const itemDoc = (listId, id) => doc(db, 'lists', listId, 'items', id)
-const msgsCol = (listId, itemId) => collection(db, 'lists', listId, 'items', itemId, 'messages')
+// `scope`: 'items' pentru discuția obișnuită a produsului; 'secret' pentru partea ascunsă a unei liste de
+// cadouri (cine a rezervat, ce s-a luat, discuția doar între cei care cumpără).
+const msgsCol = (listId, itemId, scope = 'items') => collection(db, 'lists', listId, scope, itemId, 'messages')
+const secretCol = (listId) => collection(db, 'lists', listId, 'secret')
+const secretDoc = (listId, id) => doc(db, 'lists', listId, 'secret', id)
 const productsCol = (listId) => collection(db, 'lists', listId, 'products')
 
 // Batch-urile Firestore au maxim 500 de operații; le împărțim la nevoie.
@@ -128,9 +132,11 @@ export function watchLists(user, cb, onError) {
     (snap) => cb(snap.docs.map(fromDoc), { fromCache: snap.metadata.fromCache }), (e) => onError?.(e))
 }
 
-export function createList(user, name) {
+// `kind`: 'gifts' pentru o listă de cadouri (cu cei care primesc în `recipients`).
+export function createList(user, name, kind) {
   const ref = doc(listsCol)
   fire(setDoc(ref, {
+    ...(kind === 'gifts' ? { kind, recipients: [] } : {}),
     name: name.trim(),
     ownerUid: user.uid,
     ownerEmail: user.email,
@@ -156,6 +162,11 @@ export async function deleteList(listId) {
     const msgs = await getDocs(msgsCol(listId, it.id))
     refs.push(...msgs.docs.map((m) => m.ref), it.ref)
   }
+  const secret = await getDocs(secretCol(listId)).catch(() => ({ docs: [] }))
+  for (const s of secret.docs) {
+    const msgs = await getDocs(msgsCol(listId, s.id, 'secret'))
+    refs.push(...msgs.docs.map((m) => m.ref), s.ref)
+  }
   const products = await getDocs(productsCol(listId))
   refs.push(...products.docs.map((p) => p.ref), listDoc(listId))
   fire(deleteRefs(refs))
@@ -168,10 +179,11 @@ export async function adminDeleteList(listId) {
 }
 
 // Invitația pune adresa în listă și îi dă acces în aplicație.
-export function invite(list, user, email) {
+// `receives`: pe o listă de cadouri, persoana primește cadouri (își vede doar dorințele ei).
+export function invite(list, user, email, receives = false) {
   const e = normEmail(email)
   const b = writeBatch(db)
-  b.update(listDoc(list.id), { memberEmails: arrayUnion(e) })
+  b.update(listDoc(list.id), { memberEmails: arrayUnion(e), ...(receives ? { recipients: arrayUnion(e) } : {}) })
   b.set(doc(db, 'allowed', e), { email: e, invitedByEmail: user.email, at: serverTimestamp() })
   fire(b.commit())
 }
@@ -182,12 +194,18 @@ export function inviteToApp(user, email) {
   fire(setDoc(doc(db, 'allowed', e), { email: e, invitedByEmail: user.email, at: serverTimestamp() }))
 }
 
-export function removeMember(listId, email) {
-  fire(updateDoc(listDoc(listId), { memberEmails: arrayRemove(normEmail(email)) }))
+export function removeMember(list, email) {
+  const e = normEmail(email)
+  fire(updateDoc(listDoc(list.id), { memberEmails: arrayRemove(e), ...(list.kind === 'gifts' ? { recipients: arrayRemove(e) } : {}) }))
 }
 
-export function leaveList(listId, user) {
-  fire(updateDoc(listDoc(listId), { memberEmails: arrayRemove(user.email) }))
+export function leaveList(list, user) {
+  removeMember(list, user.email)
+}
+
+// Lista de cadouri: schimbă rolul unui membru (doar creatorul listei).
+export function setReceives(listId, email, receives) {
+  fire(updateDoc(listDoc(listId), { recipients: receives ? arrayUnion(normEmail(email)) : arrayRemove(normEmail(email)) }))
 }
 
 // ---------- Produse ----------
@@ -198,14 +216,21 @@ export function watchItems(listId, cb, onError) {
   return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
 }
 
-export function addItem(listId, user, fields) {
+// Cine primește cadouri citește doar dorințele adăugate de el.
+export function watchWishes(listId, uid, cb, onError) {
+  const q = query(itemsCol(listId), where('addedBy.uid', '==', uid))
+  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
+}
+
+// `catalog: false` (lista de cadouri): produsul nu intră în sugestii.
+export function addItem(listId, user, fields, { catalog = true } = {}) {
   const ref = doc(itemsCol(listId))
   const item = newItemFields(user, fields)
   const b = writeBatch(db)
   b.set(ref, { ...item, addedAt: serverTimestamp() })
   b.update(listDoc(listId), { itemCount: increment(1) })
   // Catalogul listei: de aici vin sugestiile și raionul ținut minte.
-  b.set(doc(productsCol(listId), productKey(item.name)), {
+  if (catalog) b.set(doc(productsCol(listId), productKey(item.name)), {
     name: item.name, quantity: item.quantity, aisle: item.aisle, count: increment(1), lastAt: serverTimestamp(),
   }, { merge: true })
   fire(b.commit())
@@ -223,10 +248,15 @@ export function setItemAisle(listId, item, aisle) {
   fire(b.commit())
 }
 
-export async function deleteItem(listId, item) {
+export async function deleteItem(listId, item, { gift = false } = {}) {
   const msgs = await getDocs(msgsCol(listId, item.id))
   const b = writeBatch(db)
   msgs.docs.forEach((m) => b.delete(m.ref))
+  if (gift) {
+    const secret = await getDocs(msgsCol(listId, item.id, 'secret'))
+    secret.docs.forEach((m) => b.delete(m.ref))
+    b.delete(secretDoc(listId, item.id))
+  }
   b.delete(itemDoc(listId, item.id))
   if (!item.archived) b.update(listDoc(listId), { itemCount: increment(-1) })
   fire(b.commit())
@@ -241,6 +271,23 @@ export function setStatus(listId, itemId, user, status, reason = null, reasonTex
     resolvedBy: done ? who(user) : null,
     resolvedAt: done ? serverTimestamp() : null,
   }))
+}
+
+// ---------- Partea ascunsă a listei de cadouri (doar pentru cei care cumpără) ----------
+
+export function watchSecret(listId, cb, onError) {
+  return onSnapshot(secretCol(listId), mapSnap(cb), (e) => onError?.(e))
+}
+
+// status: 'pending' | 'reserved' („Iau eu”) | 'bought'
+export function setGiftStatus(listId, itemId, user, status) {
+  fire(setDoc(secretDoc(listId, itemId), {
+    status,
+    reservedBy: status === 'pending' ? null : who(user),
+    reservedAt: status === 'pending' ? null : serverTimestamp(),
+    resolvedBy: status === 'bought' ? who(user) : null,
+    resolvedAt: status === 'bought' ? serverTimestamp() : null,
+  }, { merge: true }))
 }
 
 export function finishTrip(listId, items) {
@@ -280,30 +327,35 @@ export function watchProducts(listId, cb) {
 
 // ---------- Discuția unui produs ----------
 
-export function watchMessages(listId, itemId, cb, onError) {
-  const q = query(msgsCol(listId, itemId), orderBy('at'))
+export function watchMessages(listId, itemId, cb, onError, scope) {
+  const q = query(msgsCol(listId, itemId, scope), orderBy('at'))
   return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
 }
 
-export function sendMessage(listId, itemId, user, { text = '', photo = null }) {
+// Contorul de mesaje stă pe produs (discuția obișnuită) sau pe partea lui ascunsă (scope 'secret').
+const counter = (b, listId, itemId, scope, fields) => (scope === 'secret'
+  ? b.set(secretDoc(listId, itemId), fields, { merge: true })
+  : b.update(itemDoc(listId, itemId), fields))
+
+export function sendMessage(listId, itemId, user, { text = '', photo = null }, scope) {
   const b = writeBatch(db)
-  b.set(doc(msgsCol(listId, itemId)), { text: text.trim(), photo, by: who(user), at: serverTimestamp(), reactions: {} })
-  b.update(itemDoc(listId, itemId), { msgCount: increment(1), lastMsgAt: serverTimestamp(), lastMsgBy: user.uid })
+  b.set(doc(msgsCol(listId, itemId, scope)), { text: text.trim(), photo, by: who(user), at: serverTimestamp(), reactions: {} })
+  counter(b, listId, itemId, scope, { msgCount: increment(1), lastMsgAt: serverTimestamp(), lastMsgBy: user.uid })
   fire(b.commit())
 }
 
-export function toggleReaction(listId, itemId, msgId, reactionId, uid, on) {
+export function toggleReaction(listId, itemId, msgId, reactionId, uid, on, scope) {
   fire(updateDoc(
-    doc(msgsCol(listId, itemId), msgId),
+    doc(msgsCol(listId, itemId, scope), msgId),
     new FieldPath('reactions', reactionId),
     on ? arrayUnion(uid) : arrayRemove(uid),
   ))
 }
 
-export function deleteMessage(listId, itemId, msgId) {
+export function deleteMessage(listId, itemId, msgId, scope) {
   const b = writeBatch(db)
-  b.delete(doc(msgsCol(listId, itemId), msgId))
-  b.update(itemDoc(listId, itemId), { msgCount: increment(-1) })
+  b.delete(doc(msgsCol(listId, itemId, scope), msgId))
+  counter(b, listId, itemId, scope, { msgCount: increment(-1) })
   fire(b.commit())
 }
 

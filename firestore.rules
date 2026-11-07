@@ -8,6 +8,9 @@ rules_version = '2';
 //   mesaje, poze), decât în listele în care e membru. O listă străină o șterge prin funcția `adminDeleteList`.
 // - `userPrefs/{uid}`: setările de aspect ale fiecăruia (temă, font etc.), doar pentru el.
 // - `announced/{uid}`: ce a anunțat deja fiecare, pe fiecare listă (pentru „Gata, anunță”), doar pentru el.
+// - Lista de cadouri (`kind: 'gifts'`): cei din `recipients` primesc cadouri. Ei citesc doar dorințele
+//   adăugate de ei și discuția lor publică; nu văd colecția `secret` (cine a rezervat, ce s-a luat,
+//   discuția celor care cumpără), nici catalogul. Rolurile le schimbă doar creatorul listei.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -29,6 +32,17 @@ service cloud.firestore {
     }
     function isOwner(list) {
       return signedIn() && list.ownerUid == request.auth.uid;
+    }
+    function isGift(list) {
+      return list.get('kind', '') == 'gifts';
+    }
+    // Primește cadouri pe lista asta.
+    function receives(list) {
+      return isGift(list) && myEmail() in list.get('recipients', []);
+    }
+    // Pe o listă obișnuită toți membrii „cumpără”.
+    function isBuyer(list) {
+      return isMember(list) && !receives(list);
     }
 
     // Adminii se adaugă manual din consolă: colecția `admins`, ID-ul documentului = adresa de email.
@@ -77,7 +91,9 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/lists/$(listId)).data;
       }
       function validList(l) {
-        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles'])
+        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients'])
+          && (!('kind' in l) || l.kind == 'gifts')
+          && (!('recipients' in l) || (l.recipients is list && l.recipients.size() <= 30))
           && (!('aisles' in l) || (l.aisles is list && l.aisles.size() <= 40))
           && l.name is string && l.name.size() > 0 && l.name.size() <= 60
           && l.memberEmails is list && l.memberEmails.size() <= 30
@@ -88,6 +104,22 @@ service cloud.firestore {
           || isOwner(before) || isAdmin()
           || after.memberEmails.hasAll(before.memberEmails)                    // doar adăugări (invitații)
           || after.memberEmails == before.memberEmails.removeAll([myEmail()]); // ieși singur din listă
+      }
+      // Tipul listei nu se schimbă; rolurile le schimbă creatorul. Ceilalți doar adaugă pe cineva care
+      // primește (la invitare) sau scot pe cineva care iese din listă cu totul.
+      function rolesOk(before, after) {
+        return after.get('kind', '') == before.get('kind', '')
+          && (after.get('recipients', []) == before.get('recipients', [])
+              || isOwner(before) || isAdmin()
+              || after.get('recipients', []).hasAll(before.get('recipients', []))
+              || !after.memberEmails.hasAny(before.get('recipients', []).removeAll(after.get('recipients', []))));
+      }
+      // Cine primește cadouri nu schimbă nimic la listă, în afară de numărul de produse și ieșirea din ea.
+      function receiverChangeOk(before, after) {
+        return !receives(before)
+          || after.diff(before).affectedKeys().hasOnly(['itemCount'])
+          || (after.diff(before).affectedKeys().hasOnly(['memberEmails', 'recipients'])
+              && after.memberEmails == before.memberEmails.removeAll([myEmail()]));
       }
 
       allow read: if isMember(resource.data) || isAdmin();
@@ -101,13 +133,32 @@ service cloud.firestore {
         && validList(request.resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.ownerEmail == resource.data.ownerEmail
-        && membersOk(resource.data, request.resource.data);
+        && membersOk(resource.data, request.resource.data)
+        && rolesOk(resource.data, request.resource.data)
+        && receiverChangeOk(resource.data, request.resource.data);
 
       allow delete: if isOwner(resource.data) || isAdmin();
 
       // Catalogul de produse folosite (sugestii și raionul ținut minte).
       match /products/{key} {
-        allow read, write: if isMember(list());
+        allow read, write: if isBuyer(list());
+      }
+
+      // Partea ascunsă a unei dorințe: rezervarea, cumpărarea și discuția celor care cumpără.
+      match /secret/{itemId} {
+        allow read, write: if isGift(list()) && isBuyer(list());
+
+        match /messages/{msgId} {
+          allow read, delete: if isGift(list()) && isBuyer(list());
+          allow create: if isGift(list()) && isBuyer(list())
+            && request.resource.data.keys().hasOnly(['text', 'photo', 'by', 'at', 'reactions'])
+            && request.resource.data.by.uid == request.auth.uid
+            && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+            && (request.resource.data.photo == null
+                || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
+          allow update: if isGift(list()) && isBuyer(list())
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+        }
       }
 
       match /items/{itemId} {
@@ -117,17 +168,31 @@ service cloud.firestore {
             && i.archived is bool;
         }
 
-        allow read, delete: if isMember(list());
+        // Cine primește cadouri vede și schimbă doar dorințele lui, pentru el; nu le șterge de tot
+        // (le marchează `removed`, ca un cadou deja luat să nu dispară pentru ceilalți).
+        function mine() {
+          return resource.data.addedBy.uid == request.auth.uid;
+        }
+        function canSee() {
+          return isMember(list()) && (!receives(list())
+            || get(/databases/$(database)/documents/lists/$(listId)/items/$(itemId)).data.addedBy.uid == request.auth.uid);
+        }
+
+        allow read: if isMember(list()) && (!receives(list()) || mine());
+        allow delete: if isBuyer(list());
         allow create: if isMember(list())
           && validItem(request.resource.data)
-          && request.resource.data.addedBy.uid == request.auth.uid;
+          && request.resource.data.addedBy.uid == request.auth.uid
+          && (!receives(list()) || request.resource.data.get('for', '') == myEmail());
         allow update: if isMember(list())
           && validItem(request.resource.data)
-          && request.resource.data.addedBy == resource.data.addedBy;
+          && request.resource.data.addedBy == resource.data.addedBy
+          && (!receives(list()) || (mine() && request.resource.data.get('for', '') == resource.data.get('for', '')));
 
         match /messages/{msgId} {
-          allow read, delete: if isMember(list());
-          allow create: if isMember(list())
+          allow read: if canSee();
+          allow delete: if isBuyer(list()) || (canSee() && resource.data.by.uid == request.auth.uid);
+          allow create: if canSee()
             && request.resource.data.keys().hasOnly(['text', 'photo', 'by', 'at', 'reactions'])
             && request.resource.data.by.uid == request.auth.uid
             && request.resource.data.text is string && request.resource.data.text.size() <= 1000
@@ -135,7 +200,7 @@ service cloud.firestore {
                 || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
           // Reacțiile: oricine din listă le poate modifica. În rest, se poate doar șterge poza
           // (la „Golește rezolvatele”, pentru produsele arhivate); textul rămâne neatins.
-          allow update: if isMember(list())
+          allow update: if canSee()
             && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
                 || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo', 'photoDeleted'])
                     && request.resource.data.photo == null && request.resource.data.photoDeleted == true));

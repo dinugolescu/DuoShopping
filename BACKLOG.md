@@ -42,27 +42,11 @@ chiar e nevoie). De gândit înainte de cod, ca să nu reproiectăm ulterior:
 - produsele luate nu trec în istoric până după Crăciun;
 - prietenii invitați intră în aplicație doar pentru lista asta.
 
-### Aflăm dacă persoana invitată are deja aplicația
+Tot în release-ul ăsta: adresa veche, https://duoshopping-9d75f.web.app, trimite spre
+https://duoshopping.web.app (Moni a reinstalat de pe adresa nouă), iar deploy-ul nu mai publică pe
+amândouă (vezi `firebase.json`).
 
-Mesajul de invitație e acum neutru, dar ar fi mai scurt dacă am ști. Acum nu putem afla: lista de acces
-(`allowed`) o poate citi doar persoana respectivă sau adminul.
-- putem ghici că persoana are deja aplicația dacă e membră în altă listă de-a noastră;
-- sau notăm prima intrare a fiecăruia în aplicație. Ca s-o folosească la invitație, telefonul celui care
-  invită trebuie să poată întreba „adresa asta a intrat vreodată?”, deci orice utilizator ar putea afla,
-  pentru orice adresă, dacă folosește aplicația. Între familie și prieteni riscul e mic; se poate limita
-  făcând verificarea pe server, doar în momentul invitației.
+### Raioanele implicite, comasate și reorganizate (mai încolo)
 
-### Unește două liste
-
-Pentru cazul rar cu două liste care au deja produse (de exemplu soț și soție care și-au făcut fiecare
-„Cumpărături” înainte să se invite): „Unește cu altă listă” în meniul listei mută produsele (cele
-identice o singură dată), apoi șterge lista rămasă goală. De făcut doar dacă apare cazul în practică.
-
-## Idei de explorat
-
-### Ture cu mai multe opriri
-
-O zi obișnuită (noiembrie 2026): copiii la ore, cumpărături la un magazin, cimitir, alt magazin,
-farmacie, vizită la mama. Aplicația gândește acum „o listă, un magazin”. De urmărit în practică ce
-lipsește: produse legate de un magazin anume, farmacia ca listă separată, lucruri de luat pentru o
-vizită, ordinea opririlor. De adunat observațiile din turele reale înainte să decidem ceva.
+O iterație peste raioanele cu care pornește o listă nouă: care merită comasate, ce ordine au în magazin,
+ce produse nimeresc greșit. Tot aici: pluralele („Pâini”) care nu-și găsesc raionul.

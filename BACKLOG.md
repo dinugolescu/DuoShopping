@@ -27,4 +27,20 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
 
 ## De făcut
 
-Nimic deocamdată.
+### Lista nouă: „Nu ai voie să faci asta” și „Se încarcă...” fără sfârșit
+
+La crearea unei liste apare eroarea „Nu ai voie să faci asta”, iar lista nouă rămâne pe „Se încarcă...”.
+Cauza probabilă: o cursă. Lista apare imediat pe ecran (scrisă întâi pe telefon), iar aplicația cere
+produsele ei înainte ca serverul să fi primit lista. Regulile verifică dacă ești membru citind lista, care
+pe server încă nu există, deci refuză, iar ascultarea produselor rămâne oprită. Lista se creează de fapt;
+la repornirea aplicației ar trebui să meargă.
+De făcut: lista nouă se afișează abia după ce serverul o confirmă (`hasPendingWrites`), cu „Se creează
+lista...” până atunci; în plus, ascultarea produselor reîncearcă singură după o eroare de acces.
+
+### „Șterge lista” pe lista altcuiva
+
+Pe o listă creată de Moni, Dinu vede „Șterge lista” (pentru că e admin), dar după confirmare lista nu se
+șterge și nu apare niciun mesaj. De făcut: în meniul listei, „Șterge lista” apare doar pentru cel care a
+creat-o; adminul șterge listele altora din panoul de admin. Dacă ștergerea nu reușește, apare un mesaj
+clar. De aflat și de ce nu merge ștergerea ca admin membru (regulile o permit; probabil o eroare
+neafișată din ștergerea în bucăți).

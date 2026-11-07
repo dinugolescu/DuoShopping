@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DuoShopping s-a mutat</title>
+<!-- Adresa veche (duoshopping-9d75f.web.app). Din browser te trimite direct pe adresa nouă.
+     Din aplicația instalată de aici explică ce e de făcut, fiindcă o aplicație instalată nu se poate muta singură. -->
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+    font: 17px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f5f6f2; color: #1d211e; text-align: center; }
+  @media (prefers-color-scheme: dark) { body { background: #121513; color: #e8ebe8; } }
+  main { max-width: 420px; }
+  a.btn { display: inline-block; margin-top: 12px; padding: 12px 20px; border-radius: 12px; background: #2e7d4f; color: #fff; text-decoration: none; font-weight: 600; }
+  p.small { font-size: 14px; opacity: .75; }
+</style>
+</head>
+<body>
+<main>
+  <h1>DuoShopping s-a mutat</h1>
+  <p>Aplicația e acum la <b>duoshopping.web.app</b>. Listele tale sunt tot acolo.</p>
+  <a class="btn" id="go" href="https://duoshopping.web.app/">Deschide DuoShopping</a>
+  <p class="small" id="installed" hidden>Ai aplicația instalată de pe adresa veche: deschide adresa nouă, adaug-o din nou pe ecranul principal, apoi șterge iconița veche.</p>
+  <p class="small" lang="en">DuoShopping has moved to duoshopping.web.app. Your lists are all there.</p>
+</main>
+<script>
+  var target = 'https://duoshopping.web.app' + location.pathname + location.search + location.hash
+  document.getElementById('go').href = target
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true
+  if (standalone) document.getElementById('installed').hidden = false
+  else location.replace(target)
+</script>
+</body>
+</html>

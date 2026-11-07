@@ -462,6 +462,13 @@ a.btn.primary { color: var(--accent-text); }
 .ann-type.bought { background: var(--accent-soft); color: var(--accent); }
 .ann-type.skipped { background: var(--skip-soft); color: var(--skip); }
 
+/* Versiunea și mulțumirile, la finalul Setărilor */
+.credits { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 28px 0 6px; color: var(--muted); font-size: 13px; text-align: center; }
+.credits .ver { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 6px 8px; }
+.credits .small { font-size: 12px; opacity: .85; }
+.news ul { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; }
+.news h3 { color: var(--text); }
+
 /* Previzualizarea după dictare */
 .preview-items { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
 .preview-items li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

@@ -9,6 +9,7 @@ import { AISLES, DEFAULT_AISLE, listAisles, guessAisle, normalize, aisleLabel, c
 import { reasonLabel } from './config.js'
 import { InviteShare, isInstalled, IconPicker, LangPicker } from './onboarding.jsx'
 import { t, locale } from './i18n.jsx'
+import { CHANGELOG, VERSION, changes } from './changelog.js'
 
 const people = (n) => t('people', n)
 const products = (n) => t('products', n)
@@ -150,6 +151,7 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
 
 export function SettingsSheet({ user, onClose }) {
   const prefs = usePrefs()
+  const [news, setNews] = useState(false)
   // Încarcă toate fonturile ca să poată fi văzute înainte de alegere.
   useEffect(() => {
     for (const f of FONTS) {
@@ -207,6 +209,30 @@ export function SettingsSheet({ user, onClose }) {
 
       <h3>{t('privacy')}</h3>
       <p className="muted small">{t('privacyText')}</p>
+
+      {/* Versiunea (atinsă, arată noutățile) și mulțumirile, discret, la final. */}
+      <footer className="credits">
+        <button type="button" className="ver" onClick={() => setNews(true)}>
+          DuoShopping {VERSION} · <u>{t('whatsNew')}</u>
+        </button>
+        <span>{t('madeBy')}</span>
+        <span className="small">{t('supportedBy')}</span>
+      </footer>
+      {news && <NewsSheet onClose={() => setNews(false)} />}
+    </Sheet>
+  )
+}
+
+function NewsSheet({ onClose }) {
+  const date = (d) => new Date(`${d}T12:00`).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })
+  return (
+    <Sheet title={t('whatsNewTitle')} onClose={onClose}>
+      {CHANGELOG.map((e) => (
+        <section key={e.v} className="news">
+          <h3>{t('versionN', e.v)} <span className="muted">· {date(e.date)}</span></h3>
+          <ul>{changes(e).map((c) => <li key={c}>{c}</li>)}</ul>
+        </section>
+      ))}
     </Sheet>
   )
 }

@@ -262,6 +262,11 @@ export default {
   markedAnnounced: (n) => (n === 1 ? 'Marcat ca anunțat' : `${n} marcate ca anunțate`),
   // Previzualizarea după dictare (sau după mai multe produse scrise cu virgulă)
   previewTitle: 'Ce am înțeles',
+  whatsNew: 'Noutăți',
+  whatsNewTitle: 'Ce e nou',
+  versionN: (v) => `Versiunea ${v}`,
+  madeBy: 'Făcut cu ♥ de Dinu și Claude',
+  supportedBy: 'cu sprijinul SoftexCo',
   previewHint: 'Corectează sau scoate ce nu e bine, apoi adaugă.',
   previewOnList: 'deja pe listă',
   previewRemove: (name) => `Scoate ${q(name)}`,

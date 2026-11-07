@@ -18,7 +18,7 @@
   "hosting": [
     {
       "site": "duoshopping-9d75f",
-      "public": "dist",
+      "public": "redirect",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -32,7 +32,7 @@
       ],
       "headers": [
         {
-          "source": "/sw.js",
+          "source": "**",
           "headers": [
             {
               "key": "Cache-Control",

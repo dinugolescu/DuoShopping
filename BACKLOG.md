@@ -2,6 +2,11 @@
 
 Idei și probleme notate pentru mai târziu.
 
+Release-ul cu notificări (noiembrie 2026) a adus: atingerea notificării deschide lista ei, numărul de
+noutăți neanunțate pe clopoțel, alegerea evenimentelor care intră în anunț, „Marchează bifatele ca
+anunțate, fără notificare” și previzualizarea produselor după dictare (sau după mai multe scrise cu
+virgulă), cu corectare și ✕ înainte de adăugare. Engleza se alege din Setări.
+
 Patch-ul din 7 noiembrie 2026 a rezolvat: dictarea pe Android (textul vine doar la sfârșit, fără
 repetări), instalarea pe Android din alt browser decât Chrome (trimitem în Chrome), mesajul de invitație
 care merge și pentru cine are deja aplicația, atenționarea când doar tu vezi o listă și cele două liste
@@ -17,56 +22,31 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
 
 ## De făcut
 
-### Previzualizare după dictare
+### Lista de cadouri (următorul release)
 
-Acum, după ce termini de vorbit, produsele intră direct pe listă. Dacă recunoașterea a auzit greșit,
-afli abia după aceea și corectezi pe rând. Ar trebui să meargă ca la poza din discuție, care se vede
-înainte de trimitere și se poate scoate:
-- după dictare apare o listă cu produsele înțelese, fiecare cu nume și cantitate (ex. „Lapte · 2 sticle”);
-- fiecare se poate corecta (nume, cantitate) sau scoate cu ✕;
-- „Adaugă toate” le pune pe listă, „Renunță” le aruncă pe toate;
-- produsele care sunt deja pe listă apar marcate, ca să nu fie adăugate de două ori.
-De văzut și dacă tot așa ar trebui să meargă textul scris cu virgule („lapte, ouă, două pâini”).
-Împărțirea în produse e în src/voice.js (`parseProducts`), adăugarea în `addMany` din src/ListView.jsx;
-branch-ul `i18n-english` le-a modificat pe amândouă, deci de pornit după ce intră engleza în main.
+Pentru Crăciun: o listă de dorințe pentru Andreea și Ștefan, la care Moni și prietenii cumpără pe ascuns.
+Un tip nou de listă cu două roluri:
+- **cei care primesc** (Andreea, Ștefan): adaugă ce își doresc și văd lista simplă, cu toate dorințele,
+  fără să afle ce s-a luat; fără bife, comentarii, poze sau chat;
+- **cei care cumpără** (Moni, prietenii): văd lista ca acum, cu ce s-a luat, comentarii, poze și chat.
 
-### Aflăm dacă persoana invitată are deja aplicația
+Hotărât până acum: copiii nu cumpără și nu-și fac cadouri unul altuia (de văzut mai târziu, doar dacă
+chiar e nevoie). De gândit înainte de cod, ca să nu reproiectăm ulterior:
+- unde stă ce trebuie ascuns copiilor. Aplicația descarcă pe telefon tot documentul unui produs, deci
+  ce s-a luat, de cine, comentariile și chatul trebuie ținute separat, într-un loc pe care regulile
+  Firebase nu-l dau copiilor, nu doar ascunse în ecran;
+- rolul se ține pe listă, pe fiecare membru (cine primește, cine cumpără), și se alege la invitare;
+- „Iau eu”: rezervarea unui cadou, ca doi prieteni să nu cumpere același lucru;
+- gruparea pe copil în loc de raioane;
+- anunțurile nu ajung la copii;
+- produsele luate nu trec în istoric până după Crăciun;
+- prietenii invitați intră în aplicație doar pentru lista asta.
 
-Mesajul de invitație e acum neutru, dar ar fi mai scurt dacă am ști. Acum nu putem afla: lista de acces
-(`allowed`) o poate citi doar persoana respectivă sau adminul.
-- putem ghici că persoana are deja aplicația dacă e membră în altă listă de-a noastră;
-- sau notăm prima intrare a fiecăruia în aplicație. Ca s-o folosească la invitație, telefonul celui care
-  invită trebuie să poată întreba „adresa asta a intrat vreodată?”, deci orice utilizator ar putea afla,
-  pentru orice adresă, dacă folosește aplicația. Între familie și prieteni riscul e mic; se poate limita
-  făcând verificarea pe server, doar în momentul invitației.
+Tot în release-ul ăsta: adresa veche, https://duoshopping-9d75f.web.app, trimite spre
+https://duoshopping.web.app (Moni a reinstalat de pe adresa nouă), iar deploy-ul nu mai publică pe
+amândouă (vezi `firebase.json`).
 
-### Unește două liste
+### Raioanele implicite, comasate și reorganizate (mai încolo)
 
-Pentru cazul rar cu două liste care au deja produse (de exemplu soț și soție care și-au făcut fiecare
-„Cumpărături” înainte să se invite): „Unește cu altă listă” în meniul listei mută produsele (cele
-identice o singură dată), apoi șterge lista rămasă goală. De făcut doar dacă apare cazul în practică.
-
-## Idei de explorat
-
-### Ture cu mai multe opriri
-
-O zi obișnuită (noiembrie 2026): copiii la ore, cumpărături la un magazin, cimitir, alt magazin,
-farmacie, vizită la mama. Aplicația gândește acum „o listă, un magazin”. De urmărit în practică ce
-lipsește: produse legate de un magazin anume, farmacia ca listă separată, lucruri de luat pentru o
-vizită, ordinea opririlor. De adunat observațiile din turele reale înainte să decidem ceva.
-
-## Would have (nu e urgent)
-
-### Aplicația în engleză
-
-Pentru cumnatul meu. Acum totul e doar în română:
-- textele sunt scrise direct în cod;
-- datele și orele se afișează în format românesc (`ro-RO`);
-- vocea ascultă doar română;
-- pagina e marcată ca fiind în română (`lang="ro"`).
-
-Ce ar trebui făcut:
-- toate textele mutate într-un fișier de traduceri (română + engleză);
-- alegerea limbii păstrată în setările contului, ca restul setărilor;
-- data, ora și vocea să urmeze limba aleasă;
-- de verificat și textele care vin de pe server (notificări, mesaje).
+O iterație peste raioanele cu care pornește o listă nouă: care merită comasate, ce ordine au în magazin,
+ce produse nimeresc greșit. Tot aici: pluralele („Pâini”) care nu-și găsesc raionul.

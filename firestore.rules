@@ -7,6 +7,7 @@ rules_version = '2';
 // - Adminul vede toate listele (doar nume, membri, număr de produse), nu și conținutul lor (produse,
 //   mesaje, poze), decât în listele în care e membru. O listă străină o șterge prin funcția `adminDeleteList`.
 // - `userPrefs/{uid}`: setările de aspect ale fiecăruia (temă, font etc.), doar pentru el.
+// - `announced/{uid}`: ce a anunțat deja fiecare, pe fiecare listă (pentru „Gata, anunță”), doar pentru el.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -61,6 +62,14 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['prefs', 'at'])
         && request.resource.data.prefs is map
         && request.resource.data.prefs.size() <= 20;
+    }
+
+    match /announced/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['lists', 'at'])
+        && request.resource.data.lists is map
+        && request.resource.data.lists.size() <= 100;
     }
 
     match /lists/{listId} {

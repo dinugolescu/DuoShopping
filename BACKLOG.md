@@ -2,7 +2,8 @@
 
 Idei și probleme notate pentru mai târziu.
 
-Versiunea 2.0 (noiembrie 2026) a adus lista de cadouri (cine primește își scrie dorințele, cine cumpără
+Versiunea 2.1 (noiembrie 2026) a adus raioane implicite mai generale (inclusiv țigări, electronice,
+rechizite, haine, cadouri) și pluralele care își găsesc raionul. Versiunea 2.0 a adus lista de cadouri (cine primește își scrie dorințele, cine cumpără
 le ia pe ascuns), produsele duplicate permise, pagina de noutăți, mulțumirile din Setări și mutarea
 adresei vechi pe cea nouă.
 
@@ -26,7 +27,4 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
 
 ## De făcut
 
-### Raioanele implicite, comasate și reorganizate (mai încolo)
-
-O iterație peste raioanele cu care pornește o listă nouă: care merită comasate, ce ordine au în magazin,
-ce produse nimeresc greșit. Tot aici: pluralele („Pâini”) care nu-și găsesc raionul.
+Nimic deocamdată.

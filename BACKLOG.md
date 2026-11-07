@@ -17,6 +17,19 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
 
 ## De făcut
 
+### Previzualizare după dictare
+
+Acum, după ce termini de vorbit, produsele intră direct pe listă. Dacă recunoașterea a auzit greșit,
+afli abia după aceea și corectezi pe rând. Ar trebui să meargă ca la poza din discuție, care se vede
+înainte de trimitere și se poate scoate:
+- după dictare apare o listă cu produsele înțelese, fiecare cu nume și cantitate (ex. „Lapte · 2 sticle”);
+- fiecare se poate corecta (nume, cantitate) sau scoate cu ✕;
+- „Adaugă toate” le pune pe listă, „Renunță” le aruncă pe toate;
+- produsele care sunt deja pe listă apar marcate, ca să nu fie adăugate de două ori.
+De văzut și dacă tot așa ar trebui să meargă textul scris cu virgule („lapte, ouă, două pâini”).
+Împărțirea în produse e în src/voice.js (`parseProducts`), adăugarea în `addMany` din src/ListView.jsx;
+branch-ul `i18n-english` le-a modificat pe amândouă, deci de pornit după ce intră engleza în main.
+
 ### Aflăm dacă persoana invitată are deja aplicația
 
 Mesajul de invitație e acum neutru, dar ar fi mai scurt dacă am ști. Acum nu putem afla: lista de acces

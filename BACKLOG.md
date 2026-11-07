@@ -58,12 +58,10 @@ limbi, ca restul aplicației. Versiunile primesc un număr (ex. 1.0 ... 1.8), de
 
 ### Mulțumiri discrete
 
-Un rând mic în josul Setărilor, lângă versiune, nu în față. Variante de ales:
-- „Făcut cu ♥ de Dinu și Claude”;
-- „Gândit de Dinu, scris împreună cu Claude”;
-- „Dinu & Claude · SoftexCo”;
-- forma de la început: „Made by Claude and Dinu@SoftexCo”.
-Rândul ar fi, de exemplu: „DuoShopping 1.9 · Noutăți · Făcut cu ♥ de Dinu și Claude”.
+Un rând mic în josul Setărilor, lângă versiune, nu în față. Ales: cu inimă și cu SoftexCo, care
+sprijină proiectul (plătește contul). Forma, cu SoftexCo pe rândul al doilea, mai mic:
+- română: „Făcut cu ♥ de Dinu și Claude” / „cu sprijinul SoftexCo”;
+- engleză: „Made with ♥ by Dinu & Claude” / „supported by SoftexCo”.
 
 ### Raioanele implicite, comasate și reorganizate (mai încolo)
 

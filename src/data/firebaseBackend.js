@@ -332,6 +332,18 @@ export function saveUserPrefs(uid, prefs) {
   fire(setDoc(doc(db, 'userPrefs', uid), { prefs, at: serverTimestamp() }))
 }
 
+// ---------- Ce ai anunțat deja („Gata, anunță”) ----------
+// Un document pe om: `lists.<listId>` = { cutoff, done } (vezi myEvents în shared.js).
+
+export function watchAnnounced(uid, cb) {
+  return onSnapshot(doc(db, 'announced', uid), (snap) => cb(snap.exists() ? snap.data().lists || {} : {}),
+    (e) => { console.error(e); cb({}) })
+}
+
+export function saveAnnounced(uid, listId, state) {
+  fire(setDoc(doc(db, 'announced', uid), { lists: { [listId]: state }, at: serverTimestamp() }, { merge: true }))
+}
+
 // ---------- Notificări ----------
 // Modulele de notificări se încarcă doar când e nevoie, ca aplicația să pornească la fel de repede.
 

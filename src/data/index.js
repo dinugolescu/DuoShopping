@@ -13,5 +13,6 @@ export const {
   watchMessages, sendMessage, toggleReaction, deleteMessage,
   watchAllLists, watchAllowed, revokeAccess,
   loadUserPrefs, saveUserPrefs,
+  watchAnnounced, saveAnnounced,
   pushStatus, enablePush, disablePush, announce,
 } = backend

@@ -3,7 +3,7 @@ import * as api from './data/index.js'
 import { THEMES, FONTS, usePrefs, setPref } from './prefs.js'
 import { relTime } from './time.js'
 import { Sheet, Switch, firstName, useToast, errText, announceErrText, store } from './ui.jsx'
-import { sessionSummary } from './data/shared.js'
+import { myEvents, markAnnounced, eventsSummary, FIRST_CUTOFF } from './data/shared.js'
 import { IconUp, IconChevron } from './icons.jsx'
 import { AISLES, DEFAULT_AISLE, listAisles, guessAisle, normalize, aisleLabel, canonicalAisleLabel } from './aisles.js'
 import { reasonLabel } from './config.js'
@@ -305,32 +305,57 @@ function PushSettings({ user }) {
 
 // ---------- „Gata, anunță” ----------
 
-const DAY = 24 * 3600 * 1000
-
-export function AnnounceSheet({ list, user, onClose }) {
-  const toast = useToast()
-  const key = `anunt-${list.id}-${user.uid}`
-  const since = Math.max(store.get(key, 0), Date.now() - DAY)
+// Ce ai făcut pe lista curentă și n-ai anunțat încă. Folosit de clopoțel (numărul) și de fereastra de anunț.
+export function useAnnounce(list, user) {
   const [items, setItems] = useState(null)
+  const [states, setStates] = useState(null)
+  useEffect(() => {
+    setItems(null)
+    return list ? api.watchItems(list.id, setItems) : undefined
+  }, [list?.id])
+  useEffect(() => api.watchAnnounced(user.uid, setStates), [user.uid])
+  if (!list || !items || !states) return { pending: null, mark: () => {} }
+  // Înainte, momentul ultimului anunț stătea doar pe telefon; îl folosim cât lista n-are încă stare în cont.
+  const state = states[list.id] ?? { cutoff: Math.max(store.get(`anunt-${list.id}-${user.uid}`, 0), FIRST_CUTOFF()) }
+  const pending = myEvents(items, user, state)
+  const mark = (keys) => api.saveAnnounced(user.uid, list.id, markAnnounced(state, pending, keys))
+  return { pending, mark }
+}
+
+const EVENT_LABEL = { added: 'evAdded', bought: 'evBought', skipped: 'evSkipped' }
+
+export function AnnounceSheet({ list, user, pending, mark, onClose }) {
+  const toast = useToast()
+  const [off, setOff] = useState(() => new Set()) // evenimentele debifate
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => api.watchItems(list.id, setItems, (e) => toast(errText(e))), [list.id, toast])
-
-  const others = list.memberEmails.filter((m) => m !== user.email)
-  const summary = items ? sessionSummary(items, user, since) : null
-  const text = summary ? [summary.text, note.trim()].filter(Boolean).join('\n') : ''
-
   const [err, setErr] = useState('')
 
-  async function send(message, remember) {
+  const others = list.memberEmails.filter((m) => m !== user.email)
+  const picked = pending ? pending.filter((e) => !off.has(e.key)) : []
+  const keys = picked.map((e) => e.key)
+  const summary = pending ? eventsSummary(picked, user) : null
+  const text = summary ? [summary.text, note.trim()].filter(Boolean).join('\n') : ''
+
+  const toggle = (key) => setOff((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n })
+  const all = pending && off.size === 0
+
+  async function send(message, withEvents) {
     setBusy(true)
     setErr('')
     const res = await sendAnnounce(list.id, message, toast)
     setBusy(false)
     if (res.ok) {
-      if (remember) store.set(key, Date.now())
+      if (withEvents && keys.length) mark(keys)
       onClose()
     } else setErr(res.error) // fereastra rămâne deschisă, ca să poți încerca din nou
+  }
+
+  function markOnly() {
+    mark(keys)
+    toast(t('markedAnnounced', keys.length))
+    setOff(new Set())
+    if (keys.length === pending.length) onClose()
   }
 
   return (
@@ -340,6 +365,29 @@ export function AnnounceSheet({ list, user, onClose }) {
       ) : (
         <>
           <p className="muted small">{t('announceHint', list.name)}</p>
+          {pending && pending.length > 0 && (
+            <>
+              <div className="ann-head">
+                <h3>{t('announcePick')}</h3>
+                <button type="button" className="link-btn" onClick={() => setOff(all ? new Set(pending.map((e) => e.key)) : new Set())}>
+                  {all ? t('pickNone') : t('pickAll')}
+                </button>
+              </div>
+              <ul className="ann-events">
+                {pending.map((e) => (
+                  <li key={e.key}>
+                    <label>
+                      <input type="checkbox" checked={!off.has(e.key)} onChange={() => toggle(e.key)} />
+                      <span className={`ann-type ${e.type}`}>{t(EVENT_LABEL[e.type])}</span>
+                      <span className="grow">{e.item.name}{e.item.quantity && <span className="muted"> · {e.item.quantity}</span>}</span>
+                      <span className="muted small">{relTime(e.at)}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {pending && !pending.length && <p className="muted">{t('nothingNew')}</p>}
           <div className="announce-preview">
             <b>{list.name}</b>
             <span>{summary ? summary.text : t('loading')}</span>
@@ -349,8 +397,13 @@ export function AnnounceSheet({ list, user, onClose }) {
             placeholder={t('announceNotePh')} aria-label={t('announceNoteLabel')} />
           {err && <p className="error">{err}</p>}
           <button className="btn primary wide" disabled={busy || !summary} onClick={() => send(text, true)}>
-            {busy ? t('sending') : t('sendAnnounce')}
+            {busy ? t('sending') : keys.length ? t('sendAnnounceN', keys.length) : t('sendAnnounce')}
           </button>
+          {pending && pending.length > 0 && (
+            <button className="btn wide" disabled={busy || !keys.length} onClick={markOnly}>
+              {t('markAnnounced', keys.length)}
+            </button>
+          )}
           <button className="btn wide" disabled={busy} onClick={() => send(atShopText(user), false)}>
             {t('announceAtShop')}
           </button>

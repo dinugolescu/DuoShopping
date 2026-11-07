@@ -15,7 +15,7 @@ export const DEMO_USERS = [
 const DB_KEY = 'cumparaturi-demo-db-v3'
 const USER_KEY = 'cumparaturi-demo-user' // sessionStorage: fiecare tab poate avea alt utilizator
 
-const empty = () => ({ lists: {}, items: {}, products: {}, messages: {}, allowed: {}, admins: { 'dinu@demo.ro': true } })
+const empty = () => ({ lists: {}, items: {}, products: {}, messages: {}, allowed: {}, announced: {}, admins: { 'dinu@demo.ro': true } })
 function load() {
   try { return { ...empty(), ...JSON.parse(localStorage.getItem(DB_KEY)) } } catch { return empty() }
 }
@@ -266,6 +266,15 @@ export function watchAllowed(cb) {
 
 export function revokeAccess(email) {
   mutate((db) => { delete db.allowed[normEmail(email)] })
+}
+
+// ---------- Ce ai anunțat deja ----------
+
+export function watchAnnounced(uid, cb) {
+  return watch((db) => db.announced?.[uid] || {}, cb)
+}
+export function saveAnnounced(uid, listId, state) {
+  mutate((db) => { db.announced ??= {}; db.announced[uid] = { ...db.announced[uid], [listId]: state } })
 }
 
 // ---------- Notificări (în demo nu se trimite nimic) ----------

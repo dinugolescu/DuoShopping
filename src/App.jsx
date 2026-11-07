@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
 import { ToastHost, useToast, errText, store } from './ui.jsx'
 import { ListView } from './ListView.jsx'
-import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet } from './sheets.jsx'
+import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet, useAnnounce } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
@@ -93,11 +93,30 @@ function NoAccess({ user }) {
 }
 
 
+// Lista cerută în adresă (de la o notificare). O citim o dată și curățăm adresa.
+function listFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const id = params.get('list')
+  if (id) {
+    params.delete('list')
+    const rest = params.toString()
+    window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash)
+  }
+  return id
+}
+const START_LIST = listFromUrl()
+
 function Home({ user, admin }) {
   const toast = useToast()
   const [lists, setLists] = useState(null)
   const order = usePrefs().listOrder
-  const [currentId, setCurrentId] = useState(() => store.get('lista-curenta'))
+  const [currentId, setCurrentId] = useState(() => START_LIST || store.get('lista-curenta'))
+  // Atingerea unei notificări deschide lista ei: prin adresă (`?list=`) sau prin mesaj de la service worker.
+  useEffect(() => {
+    const onMsg = (e) => { if (e.data?.type === 'open-list') { setCurrentId(e.data.listId); setSheet(null) } }
+    navigator.serviceWorker?.addEventListener('message', onMsg)
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg)
+  }, [])
   const [tipsDone, setTipsDone] = useState(tipsSeen)
   const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
 
@@ -132,6 +151,10 @@ function Home({ user, admin }) {
   const alone = current && current.memberEmails.length === 1 && !personal.includes(current.id)
   const markPersonal = () => setPref('personalLists', [...personal.filter((id) => lists.some((l) => l.id === id)), current.id])
 
+  // Câte lucruri ai făcut pe listă și n-ai anunțat (doar unde ai pe cine anunța).
+  const ann = useAnnounce(current, user)
+  const unannounced = current && current.memberEmails.length > 1 ? ann.pending?.length || 0 : 0
+
   if (!sorted) return <div className="center muted">{t('loadingLists')}</div>
 
   return (
@@ -142,8 +165,10 @@ function Home({ user, admin }) {
           <IconChevron />
         </button>
         {current && (
-          <button className="icon-btn" onClick={() => setSheet('announce')} aria-label={t('announceOthers')}>
+          <button className="icon-btn" onClick={() => setSheet('announce')}
+            aria-label={unannounced ? t('announceOthersN', unannounced) : t('announceOthers')}>
             <IconBell />
+            {unannounced > 0 && <span className="count">{unannounced > 99 ? '99+' : unannounced}</span>}
           </button>
         )}
         {current && (
@@ -182,7 +207,7 @@ function Home({ user, admin }) {
       {sheet === 'share' && current && <ShareSheet list={current} user={user} admin={admin} onClose={close} />}
       {sheet === 'share-new' && current?.id === currentId && <ShareSheet list={current} user={user} admin={admin} fresh onClose={close} />}
       {sheet === 'settings' && <SettingsSheet user={user} onClose={close} />}
-      {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} onClose={close} />}
+      {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} pending={ann.pending} mark={ann.mark} onClose={close} />}
       {sheet === 'admin' && admin && <AdminSheet user={user} onClose={close} />}
       {sheet === 'aisles' && current && <AislesSheet list={current} onClose={close} />}
       {sheet === 'invite-app' && <InviteAppSheet user={user} onClose={close} />}

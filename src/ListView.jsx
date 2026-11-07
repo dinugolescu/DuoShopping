@@ -160,6 +160,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
   const [listening, setListening] = useState(false)
+  const [preview, setPreview] = useState(null) // produsele înțelese, de confirmat înainte de adăugare
   const ref = useRef()
   const stop = useRef(null)
   useEffect(() => () => stop.current?.(), [])
@@ -175,7 +176,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     setListening(true)
     stop.current = listen({
       onPartial: (text) => setName(text),
-      onFinal: (text) => { setName(''); onAddMany(parseProducts(text, { spoken: true })) },
+      onFinal: (text) => { setName(''); showPreview(parseProducts(text, { spoken: true })) },
       onError: (code) => {
         if (code === 'no-result') { store.set(KEYBOARD_VOICE_KEY, true); ref.current?.focus() }
         const t = speechErrText(code)
@@ -197,6 +198,11 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
       .map(({ p }) => p)
   }, [name, products, pending, enabled])
 
+  function showPreview(found) {
+    if (found.length) setPreview(found)
+    else toast(t('noneFound'))
+  }
+
   function submit(e) {
     e.preventDefault()
     if (!name.trim()) return
@@ -204,7 +210,8 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     // Unde vocea merge prin tastatură, despărțim și după „și” (dictarea pune rar virgule).
     const spoken = !!store.get(KEYBOARD_VOICE_KEY)
     const many = !qty.trim() && (/[,;]/.test(name) || (spoken && hasSpokenAnd(name))) ? parseProducts(name, { spoken }) : null
-    if (many && many.length > 1 ? onAddMany(many) : onAdd({ name, quantity: qty })) { setName(''); setQty('') }
+    if (many && many.length > 1) { setName(''); setQty(''); setPreview(many); return }
+    if (onAdd({ name, quantity: qty })) { setName(''); setQty('') }
     ref.current?.focus()
   }
 
@@ -238,7 +245,60 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
           ))}
         </div>
       )}
+      {preview && (
+        <PreviewSheet found={preview} pending={pending} onClose={() => setPreview(null)}
+          onAdd={(list) => { onAddMany(list); setPreview(null) }} />
+      )}
     </div>
+  )
+}
+
+// Ce s-a înțeles din dictare (sau din mai multe produse scrise cu virgulă): le poți corecta sau scoate
+// înainte să ajungă pe listă. Cele deja pe listă sunt marcate și nu se adaugă din nou.
+function PreviewSheet({ found, pending, onAdd, onClose }) {
+  const [rows, setRows] = useState(() => found.map((p, i) => ({ ...p, key: i })))
+  const onList = new Set(pending.map((i) => normalize(i.name)))
+  const change = (key, patch) => setRows((r) => r.map((x) => (x.key === key ? { ...x, ...patch } : x)))
+  const remove = (key) => setRows((r) => r.filter((x) => x.key !== key))
+  const valid = rows.filter((r) => r.name.trim())
+  const fresh = valid.filter((r) => !onList.has(normalize(r.name)))
+
+  function submit(e) {
+    e.preventDefault()
+    if (fresh.length) onAdd(valid.map(({ name, quantity }) => ({ name: name.trim(), quantity: (quantity || '').trim() })))
+  }
+
+  return (
+    <Sheet title={t('previewTitle')} onClose={onClose}>
+      <form onSubmit={submit}>
+        <p className="muted small">{t('previewHint')}</p>
+        {rows.length ? (
+          <ul className="preview-items">
+            {rows.map((r) => {
+              const dup = r.name.trim() && onList.has(normalize(r.name))
+              return (
+                <li key={r.key} className={dup ? 'dup' : ''}>
+                  <input className="p-name" value={r.name} onChange={(e) => change(r.key, { name: e.target.value })}
+                    maxLength={120} aria-label={t('productLabel')} />
+                  <input className="p-qty" value={r.quantity || ''} onChange={(e) => change(r.key, { quantity: e.target.value })}
+                    maxLength={20} placeholder={t('qtyPh')} aria-label={t('qtyLabel')} />
+                  <button type="button" className="icon-btn" onClick={() => remove(r.key)} aria-label={t('previewRemove', r.name)}>
+                    <IconX />
+                  </button>
+                  {dup && <span className="on-list">{t('previewOnList')}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p className="muted">{t('previewEmpty')}</p>
+        )}
+        <div className="row">
+          <button type="button" className="btn" onClick={onClose}>{t('previewCancel')}</button>
+          <button className="btn primary grow" disabled={!fresh.length}>{t('previewAdd', fresh.length)}</button>
+        </div>
+      </form>
+    </Sheet>
   )
 }
 

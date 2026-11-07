@@ -447,6 +447,28 @@ a.btn.primary { color: var(--accent-text); }
   border: 1px solid var(--line); border-radius: 14px; background: var(--bg); white-space: pre-wrap;
 }
 .announce-preview + input { width: 100%; margin-bottom: 10px; }
+.ann-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ann-head h3 { margin-top: 16px; }
+.ann-head .link-btn { margin-top: 0; padding: 4px; }
+.ann-events {
+  list-style: none; padding: 0; margin: 6px 0 4px; max-height: 38dvh; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 12px;
+}
+.ann-events li + li { border-top: 1px solid var(--line); }
+.ann-events label { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; min-width: 0; }
+.ann-events .grow { min-width: 0; overflow-wrap: anywhere; }
+.ann-events input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.ann-type { flex: none; font-size: 12px; padding: 2px 7px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.ann-type.bought { background: var(--accent-soft); color: var(--accent); }
+.ann-type.skipped { background: var(--skip-soft); color: var(--skip); }
+
+/* Previzualizarea după dictare */
+.preview-items { list-style: none; padding: 0; margin: 10px 0; display: flex; flex-direction: column; gap: 8px; }
+.preview-items li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.preview-items .p-name { flex: 1 1 140px; min-width: 0; }
+.preview-items .p-qty { flex: 0 1 90px; min-width: 0; }
+.preview-items .on-list { flex-basis: 100%; font-size: 13px; color: var(--skip); margin-top: -4px; }
+.preview-items li.dup input { border-color: var(--skip); }
 
 /* Editarea raioanelor */
 .aisle-edit { list-style: none; padding: 0; margin: 8px 0 12px; display: flex; flex-direction: column; gap: 8px; }

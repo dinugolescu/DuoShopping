@@ -1,5 +1,7 @@
 // Micșorează o poză pe telefon înainte de trimitere: latura maximă 1200 px, JPEG.
 // Rezultatul (≈100–250 KB) se salvează direct în baza de date, ca text base64.
+import { t } from './i18n.jsx'
+
 const MAX_SIDE = 1200
 const MAX_CHARS = 850_000 // documentele Firestore au maxim 1 MB
 
@@ -16,7 +18,7 @@ export async function compressImage(file) {
     const url = canvas.toDataURL('image/jpeg', q)
     if (url.length <= MAX_CHARS) return url
   }
-  throw new Error('Poza e prea mare chiar și după comprimare.')
+  throw new Error(t('photoTooBig'))
 }
 
 function loadImage(file) {
@@ -24,7 +26,7 @@ function loadImage(file) {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Fișierul nu pare să fie o poză.')) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(t('notAPhoto'))) }
     img.src = url
   })
 }

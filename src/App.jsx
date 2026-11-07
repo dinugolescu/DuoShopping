@@ -6,7 +6,8 @@ import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, Aisles
 import { IconChevron, IconUsers, IconBell } from './icons.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
-import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt, Welcome, showWelcome, tipsSeen } from './onboarding.jsx'
+import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt, Welcome, LangPicker, showWelcome, tipsSeen } from './onboarding.jsx'
+import { t } from './i18n.jsx'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
 }
 
 function Root() {
+  usePrefs() // la schimbarea limbii re-randăm tot arborele, ca textele să treacă pe noua limbă
   const toast = useToast()
   const [user, setUser] = useState(undefined) // undefined = încă nu știm
   const [access, setAccess] = useState(null)
@@ -31,9 +33,9 @@ function Root() {
     return api.watchAccess(user, setAccess)
   }, [user?.uid])
 
-  if (user === undefined) return <div className="center muted">Se încarcă…</div>
+  if (user === undefined) return <div className="center muted">{t('loading')}</div>
   if (!user) return <Login />
-  if (!access) return <div className="center muted">Se verifică accesul…</div>
+  if (!access) return <div className="center muted">{t('checkingAccess')}</div>
   if (!access.allowed) return <NoAccess user={user} />
   return <Home user={user} admin={access.admin} />
 }
@@ -51,26 +53,24 @@ function Login() {
     <main className="login">
       <Logo />
       <h1>DuoShopping</h1>
-      <p className="muted">Lista de cumpărături comună, sincronizată pe toate telefoanele.</p>
+      <p className="muted">{t('tagline')}</p>
       {api.isDemo ? (
         <>
-          <p className="demo-note">
-            Mod demo: datele stau doar în acest browser. Dinu e admin; Moni, Andreea și Ștefan intră doar după ce îi invită cineva.
-            Deschide mai multe taburi ca să vezi sincronizarea.
-          </p>
+          <p className="demo-note">{t('demoNote')}</p>
           {api.DEMO_USERS.map((u, i) => (
             <button key={u.uid} className="btn primary wide" disabled={busy} onClick={() => go(i)}>
-              Intră ca {u.name}
+              {t('signInAs', u.name)}
             </button>
           ))}
         </>
       ) : (
         <button className="btn primary wide" disabled={busy} onClick={() => go()}>
-          Intră cu Google
+          {t('signInGoogle')}
         </button>
       )}
       {err && <p className="error">{err}</p>}
       <InAppWarning />
+      <LangPicker compact />
     </main>
   )
 }
@@ -84,17 +84,14 @@ function NoAccess({ user }) {
   return (
     <main className="login">
       <Logo />
-      <h1>Încă nu ai acces</h1>
-      <p className="muted">
-        Roagă pe cineva care folosește deja aplicația să te invite într-o listă, pe adresa <b>{user.email}</b>.
-        Pagina se deschide singură imediat după invitație.
-      </p>
-      <button className="btn wide" onClick={() => api.signOut()}>Intră cu alt cont</button>
+      <h1>{t('noAccessTitle')}</h1>
+      <p className="muted">{t('noAccessBody', user.email)}</p>
+      <button className="btn wide" onClick={() => api.signOut()}>{t('otherAccount')}</button>
+      <LangPicker compact />
     </main>
   )
 }
 
-const FIRST_LIST = 'Cumpărături'
 
 function Home({ user, admin }) {
   const toast = useToast()
@@ -135,23 +132,23 @@ function Home({ user, admin }) {
   const alone = current && current.memberEmails.length === 1 && !personal.includes(current.id)
   const markPersonal = () => setPref('personalLists', [...personal.filter((id) => lists.some((l) => l.id === id)), current.id])
 
-  if (!sorted) return <div className="center muted">Se încarcă listele…</div>
+  if (!sorted) return <div className="center muted">{t('loadingLists')}</div>
 
   return (
     <div className="app">
       <header className="top">
-        <button className="list-switch" onClick={() => setSheet('menu')} aria-label="Alege lista">
+        <button className="list-switch" onClick={() => setSheet('menu')} aria-label={t('pickList')}>
           <span className="list-title">{current ? current.name : 'DuoShopping'}</span>
           <IconChevron />
         </button>
         {current && (
-          <button className="icon-btn" onClick={() => setSheet('announce')} aria-label="Gata, anunță ceilalți">
+          <button className="icon-btn" onClick={() => setSheet('announce')} aria-label={t('announceOthers')}>
             <IconBell />
           </button>
         )}
         {current && (
           <button className={`icon-btn ${alone ? 'alone' : ''}`} onClick={() => setSheet('share')}
-            aria-label={alone ? 'Doar tu vezi lista. Invită pe cineva' : 'Cine vede lista'}>
+            aria-label={alone ? t('aloneInvite') : t('whoSees')}>
             <IconUsers />
             {current.memberEmails.length > 1 && <span className="count">{current.memberEmails.length}</span>}
             {alone && <span className="count alert" aria-hidden="true">!</span>}
@@ -162,8 +159,8 @@ function Home({ user, admin }) {
       <InstallBanner onOpen={() => setSheet('install')} />
       {alone && (
         <div className="hint-bar alone-bar">
-          <button className="grow hint-main" onClick={() => setSheet('share')}>👤 Doar tu vezi lista asta. <b>Invită pe cineva</b></button>
-          <button className="btn small" onClick={markPersonal}>E personală</button>
+          <button className="grow hint-main" onClick={() => setSheet('share')}>{t('aloneBar')}</button>
+          <button className="btn small" onClick={markPersonal}>{t('itsPersonal')}</button>
         </div>
       )}
       {current && tipsDone && <PushPrompt user={user} />}
@@ -196,19 +193,17 @@ function Home({ user, admin }) {
 }
 
 function EmptyLists({ user, onCreate, onMenu }) {
-  const [name, setName] = useState(FIRST_LIST)
+  const [name, setName] = useState(() => t('firstList'))
   return (
     <main className="empty">
-      <h2>Nicio listă încă</h2>
-      <p className="muted">
-        Dacă cineva din familie are deja o listă, roagă-l să te invite pe adresa <b>{user.email}</b>:
-        lista apare aici singură. Altfel, începe tu una și invită-i pe ceilalți.
-      </p>
+      <h2>{t('noListsTitle')}</h2>
+      <p className="muted">{t('noListsBody', user.email)}</p>
       <form className="row" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onCreate(name) }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Numele listei" maxLength={60} />
-        <button className="btn primary" disabled={!name.trim()}>Creează</button>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('listNameLabel')} maxLength={60} />
+        <button className="btn primary" disabled={!name.trim()}>{t('create')}</button>
       </form>
-      <button className="btn wide" onClick={onMenu}>Setări și cont</button>
+      <button className="btn wide" onClick={onMenu}>{t('settingsAndAccount')}</button>
+
     </main>
   )
 }

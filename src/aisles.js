@@ -9,6 +9,8 @@
 //    („rosi” prinde „rosii”, „rosie”). Dintre rădăcini câștigă cea mai lungă.
 // Când corectezi raionul unui produs, aplicația ține minte alegerea ta pentru lista respectivă
 // și nu mai ghicește pentru el.
+// Dicționarul are cuvinte în română și în engleză (WORDS_EN), ca ghicitul să meargă în ambele limbi.
+import { t } from './i18n.jsx'
 
 export const AISLES = [
   { id: 'legume', label: 'Legume și fructe', icon: '🥦' },
@@ -29,6 +31,14 @@ export const AISLES = [
 
 export const DEFAULT_AISLE = 'altele'
 export const aisleById = (id) => AISLES.find((a) => a.id === id) || AISLES[AISLES.length - 1]
+
+// Numele de mai sus sunt cele de bază, salvate pe listă. Un raion implicit neredenumit se afișează
+// în limba aleasă de fiecare; unul redenumit de voi rămâne cum l-ați scris.
+const DEFAULT_LABEL = Object.fromEntries(AISLES.map((a) => [a.id, a.label]))
+export const aisleLabel = (a) => (DEFAULT_LABEL[a.id] === a.label ? t(`aisle.${a.id}`) : a.label)
+// La salvare, numele tradus al unui raion implicit revine la numele de bază.
+export const canonicalAisleLabel = (id, label) =>
+  DEFAULT_LABEL[id] && label === t(`aisle.${id}`) ? DEFAULT_LABEL[id] : label
 
 const WORDS = {
   legume: [
@@ -93,6 +103,45 @@ const WORDS = {
   animale: ['hrana', 'pisic', 'caine', 'catel', 'whiskas', 'pedigree', 'purina', 'litiera', 'nisip pentru'],
 }
 
+// Aceleași raioane, cu produse scrise în engleză. Rădăcinile sunt alese să nu prindă cuvinte românești.
+const WORDS_EN = {
+  legume: [
+    'tomato', 'cucumber', 'onion', 'garlic', 'potato', 'carrot', 'cabbage', 'lettuce', 'spinach', 'salad',
+    'parsley', '=dill', 'celery', 'courgette', 'zucchini', 'aubergine', 'eggplant', 'mushroom', 'cauliflower',
+    'leek', 'radish', 'beetroot', 'ginger', 'vegetable', '=veg', '=veggies', 'fruit', '=apple', '=apples',
+    '=pear', '=pears', '=plum', '=plums', 'lemon', 'orange', 'grape', 'strawberr', 'raspberr', 'blueberr',
+    'blackberr', 'cherr', 'apricot', 'peach', 'melon', 'watermelon', 'pineapple', 'pomegranate', '=figs',
+  ],
+  panificatie: ['bread', '=bun', '=buns', 'bagel', 'baguet', '=loaf', '=loaves', 'muffin', '=wrap', '=wraps', 'brioche', '=pastry', '=pastries'],
+  lactate: ['milk', 'cheese', '=butter', 'yogurt', 'yoghurt', 'cream', '=egg', '=eggs', 'quark'],
+  carne: [
+    'chicken', 'beef', 'pork', 'lamb', 'turkey', '=ham', 'sausage', '=fish', 'salmon', 'tuna',
+    'shrimp', 'prawn', 'steak', 'mince', 'meat', '=deli',
+  ],
+  congelate: ['frozen', '=ice', '=peas'],
+  bacanie: [
+    'flour', 'sugar', '=salt', '=oil', 'vinegar', '=rice', '=pasta', 'noodle', '=beans', 'lentil', 'chickpea',
+    'canned', 'sauce', 'mayo', 'mustard', 'spice', 'honey', '=jam', 'olive', 'soup', 'yeast', 'stock cube',
+  ],
+  micdejun: ['coffee', '=tea', 'teabag', 'cocoa', '=oats', 'oatmeal', 'porridge', 'granola', 'cornflakes'],
+  dulciuri: [
+    'chocolate', 'cookie', 'candy', 'sweets', '=cake', 'crisps', 'pretzel', '=nuts', 'almond', 'peanut',
+    'cashew', 'pistachio', 'raisin', '=gum', 'dessert',
+  ],
+  bauturi: ['=water', 'juice', 'beer', '=wine', 'soda', 'coke', 'lemonade', 'vodk', 'whiskey', 'cider', 'drink', 'sparkling', 'champagne'],
+  curatenie: [
+    'bleach', 'sponge', '=foil', 'napkin', 'light bulb', 'batteri', 'candle', 'cleaner', 'trash bag',
+    'bin bag', 'garbage bag', 'dish soap', 'washing up', 'kitchen roll', 'paper towel', 'toilet paper', 'toilet roll',
+    'dishwasher', 'laundry', 'fabric softener',
+  ],
+  igiena: [
+    'shampoo', 'conditioner', 'soap', 'tooth', 'lotion', 'razor', 'tampon', 'diaper', 'nappy', 'nappies', 'floss',
+    'mouthwash', 'cotton', 'shower gel', 'body wash', 'wet wipes', 'makeup', 'mascara', 'lipstick',
+  ],
+  farmacie: ['medicine', 'painkiller', 'plaster', 'bandage', '=pill', '=pills', 'cough', 'antacid', 'allerg'],
+  animale: ['cat food', 'dog food', 'litter', 'kibble', 'pet food'],
+}
+
 // Expresii care trebuie recunoscute înaintea cuvintelor individuale.
 const PHRASES = {
   'pasta de dinti': 'igiena', 'gel de dus': 'igiena', 'lapte de corp': 'igiena', 'apa micelara': 'igiena',
@@ -106,6 +155,18 @@ const PHRASES = {
   'apa oxigenata': 'farmacie', 'sirop de tuse': 'farmacie', 'test de sarcina': 'farmacie',
   'castraveti murati': 'bacanie', 'ardei copt': 'bacanie', 'lapte praf': 'bacanie',
   'nisip pisici': 'animale', 'hrana pisici': 'animale', 'hrana caini': 'animale',
+  // engleză
+  'peanut butter': 'bacanie', 'tomato paste': 'bacanie', 'tomato sauce': 'bacanie', 'baking powder': 'bacanie',
+  'coconut milk': 'bacanie', 'olive oil': 'bacanie', 'bay leaves': 'bacanie', 'canned tomatoes': 'bacanie',
+  'ice cream': 'congelate', 'frozen peas': 'congelate', 'fish fingers': 'congelate',
+  'dishwasher tablets': 'curatenie', 'washing powder': 'curatenie', 'cream cleaner': 'curatenie',
+  'baking paper': 'curatenie', 'cling film': 'curatenie',
+  'hand cream': 'igiena', 'face cream': 'igiena', 'body lotion': 'igiena', 'hand soap': 'igiena',
+  'cough syrup': 'farmacie', 'pregnancy test': 'farmacie', 'cat litter': 'animale',
+  'orange juice': 'bauturi', 'apple juice': 'bauturi', 'tonic water': 'bauturi',
+  'soy milk': 'lactate', 'oat milk': 'lactate', 'almond milk': 'lactate', 'sour cream': 'lactate',
+  'chocolate milk': 'lactate', 'green tea': 'micdejun', 'bell pepper': 'legume', 'spring onion': 'legume',
+  'sweet potato': 'legume', 'apple pie': 'dulciuri',
 }
 
 export function normalize(s) {
@@ -122,7 +183,8 @@ export const productKey = (name) => normalize(name).replace(/ /g, '-').slice(0, 
 
 const EXACT = new Map()
 const STEMS = []
-for (const [aisle, words] of Object.entries(WORDS)) {
+for (const [aisle, words] of [...Object.entries(WORDS), ...Object.entries(WORDS_EN)]) {
+
   for (const w of words) {
     const n = normalize(w.replace(/^=/, ''))
     if (w.startsWith('=')) EXACT.set(n, aisle)

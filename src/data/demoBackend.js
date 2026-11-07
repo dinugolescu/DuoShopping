@@ -3,6 +3,7 @@
 // Dinu e administrator; Moni, Andreea și Ștefan nu au acces până nu sunt invitați.
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
 import { productKey } from '../aisles.js'
+import { t } from '../i18n.jsx'
 
 export const DEMO_USERS = [
   { uid: 'demo-dinu', name: 'Dinu', email: 'dinu@demo.ro', photo: null },
@@ -270,7 +271,7 @@ export function revokeAccess(email) {
 // ---------- Notificări (în demo nu se trimite nimic) ----------
 
 export const pushStatus = () => 'unsupported'
-export async function enablePush() { throw new Error('În modul demo nu există notificări.') }
+export async function enablePush() { throw new Error(t('pushDemo')) }
 export async function disablePush() {}
 export async function announce() {
   return { phones: 0, withoutPhone: [], demo: true }

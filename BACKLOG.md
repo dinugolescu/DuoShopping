@@ -46,6 +46,25 @@ Tot în release-ul ăsta: adresa veche, https://duoshopping-9d75f.web.app, trimi
 https://duoshopping.web.app (Moni a reinstalat de pe adresa nouă), iar deploy-ul nu mai publică pe
 amândouă (vezi `firebase.json`).
 
+Tot în release-ul ăsta, cele două de mai jos.
+
+### Noutăți pe versiuni (changelog ascuns)
+
+O pagină cu ce s-a schimbat la fiecare versiune, în limbaj de zi cu zi, nu tehnic („Atingerea unei
+notificări deschide direct lista ei”). Să cuprindă și versiunile de dinainte; istoria e toată în git,
+cam 8 versiuni din 6 și 7 noiembrie 2026 (prima listă, notificările, invitațiile, vocea, engleza,
+anunțurile cu bife...). Ascunsă: se deschide din numărul versiunii din josul Setărilor. În ambele
+limbi, ca restul aplicației. Versiunile primesc un număr (ex. 1.0 ... 1.8), de ținut la fiecare release.
+
+### Mulțumiri discrete
+
+Un rând mic în josul Setărilor, lângă versiune, nu în față. Variante de ales:
+- „Făcut cu ♥ de Dinu și Claude”;
+- „Gândit de Dinu, scris împreună cu Claude”;
+- „Dinu & Claude · SoftexCo”;
+- forma de la început: „Made by Claude and Dinu@SoftexCo”.
+Rândul ar fi, de exemplu: „DuoShopping 1.9 · Noutăți · Făcut cu ♥ de Dinu și Claude”.
+
 ### Raioanele implicite, comasate și reorganizate (mai încolo)
 
 O iterație peste raioanele cu care pornește o listă nouă: care merită comasate, ce ordine au în magazin,

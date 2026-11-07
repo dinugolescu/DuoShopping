@@ -5,7 +5,7 @@ import { relTime } from './time.js'
 import { Sheet, Switch, firstName, useToast, errText, announceErrText, store } from './ui.jsx'
 import { myEvents, markAnnounced, eventsSummary, FIRST_CUTOFF } from './data/shared.js'
 import { IconUp, IconChevron } from './icons.jsx'
-import { AISLES, DEFAULT_AISLE, listAisles, guessAisle, normalize, aisleLabel, canonicalAisleLabel } from './aisles.js'
+import { AISLES, DEFAULT_AISLE, LEGACY, listAisles, guessAisle, knownAisle, normalize, aisleLabel, canonicalAisleLabel } from './aisles.js'
 import { reasonLabel } from './config.js'
 import { InviteShare, isInstalled, IconPicker, LangPicker } from './onboarding.jsx'
 import { t, locale } from './i18n.jsx'
@@ -529,10 +529,30 @@ export function AislesSheet({ list, onClose }) {
     if (!window.confirm(t('aislesResetConfirm'))) return
     setRows(AISLES.map((a) => ({ ...a, label: aisleLabel(a), keywords: '' })))
   }
+  // Treci pe setul nou: raioanele implicite noi, apoi cele adăugate de voi (cu cuvintele lor), apoi „Altele”.
+  // Produsele din raioanele vechi își găsesc singure locul în cele noi.
+  const oldSet = rows.some((a) => LEGACY[a.id])
+  function upgrade() {
+    if (!window.confirm(t('aislesUpgradeConfirm'))) return
+    const isDefault = (id) => AISLES.some((a) => a.id === id) || LEGACY[id]
+    const own = rows.filter((a) => !isDefault(a.id))
+    const base = AISLES.filter((a) => a.id !== DEFAULT_AISLE).map((a) => {
+      const kept = rows.find((r) => r.id === a.id)
+      return { ...a, label: aisleLabel(a), keywords: kept?.keywords || '' }
+    })
+    const other = AISLES.find((a) => a.id === DEFAULT_AISLE)
+    setRows([...base, ...own, { ...other, label: aisleLabel(other), keywords: rows.find((r) => r.id === DEFAULT_AISLE)?.keywords || '' }])
+  }
 
   return (
     <Sheet title={t('aislesTitle', list.name)} onClose={onClose}>
       <p className="muted small">{t('aislesHint')}</p>
+      {oldSet && (
+        <div className="hint-bar">
+          <span className="grow small">{t('aislesOldSet')}</span>
+          <button type="button" className="btn small primary" onClick={upgrade}>{t('aislesUpgrade')}</button>
+        </div>
+      )}
       <ul className="aisle-edit">
         {rows.map((a, i) => (
           <li key={a.id}>
@@ -586,7 +606,7 @@ export function HistorySheet({ list, user, onClose }) {
   const onList = new Set(pending.map((i) => normalize(i.name)))
 
   function readd(item) {
-    const aisle = aisles.some((a) => a.id === item.aisle) ? item.aisle : guessAisle(item.name, aisles)
+    const aisle = item.aisle ? knownAisle(aisles, item.aisle, item.name) : guessAisle(item.name, aisles)
     api.addItem(list.id, user, { name: item.name, quantity: item.quantity || '', note: item.note || '', aisle })
     toast(t('toastBack', item.name))
   }

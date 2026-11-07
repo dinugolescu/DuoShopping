@@ -4,6 +4,19 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.1', date: '2026-11-08',
+    ro: [
+      'Raioane noi, mai generale: Aprozar, Vicii, Drogerie, Electronice și bricolaj, Papetărie și rechizite, Haine și încălțăminte, Cadouri și flori. Țigările, becurile sau caietele nu mai ajung la „Altele”.',
+      'Produsele deja pe listă trec singure în raioanele noi. Listele cu raioane modificate de voi au butonul „Treci pe raioanele noi”.',
+      'Pluralele își găsesc raionul („Pâini” ajunge la pâine).',
+    ],
+    en: [
+      'New, more general aisles: Fruit and veg, Treats and vices, Household and toiletries, Electronics and DIY, Stationery and school, Clothes and shoes, Gifts and flowers. Cigarettes, light bulbs or notebooks no longer end up in “Other”.',
+      'Items already on the list move to the new aisles on their own. Lists with aisles you changed get a “Switch to new aisles” button.',
+      'Romanian plurals find their aisle too.',
+    ],
+  },
+  {
     v: '2.0', date: '2026-11-07',
     ro: [
       'Liste de cadouri: unii își scriu dorințele, alții le cumpără pe ascuns. Cine primește cadouri nu vede ce s-a luat; cei care cumpără au „Iau eu”, idei ascunse și o discuție doar a lor.',

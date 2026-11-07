@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './data/index.js'
 import { SKIP_REASONS, CUSTOM, reasonLabel } from './config.js'
-import { listAisles, aisleIn, aisleLabel, guessAisle, normalize, productKey } from './aisles.js'
+import { DEFAULT_AISLE, listAisles, fitAisle, knownAisle, aisleLabel, guessAisle, normalize, productKey } from './aisles.js'
 
 import { relTime, fullDate } from './time.js'
 import { usePrefs } from './prefs.js'
@@ -15,7 +15,8 @@ import { t } from './i18n.jsx'
 const SEEN_KEY = 'mesaje-vazute'
 const KEYBOARD_VOICE_KEY = 'voce-prin-tastatura'
 export const sameProduct = (a, b) => normalize(a.name) === normalize(b.name) && normalize(a.quantity || '') === normalize(b.quantity || '')
-const itemAisle = (i, aisles) => aisleIn(aisles, i.aisle || guessAisle(i.name, aisles))
+// „Altele” înseamnă „nu știam unde”: ce a ajuns acolo se ghicește din nou (dicționarul crește de la o versiune la alta).
+const itemAisle = (i, aisles) => (i.aisle && i.aisle !== DEFAULT_AISLE ? fitAisle(aisles, i.aisle, i.name) : guessAisle(i.name, aisles))
 
 export function ListView({ list, user }) {
   const toast = useToast()
@@ -63,7 +64,7 @@ export function ListView({ list, user }) {
       return false
     }
     const known = productMap.get(productKey(n))
-    const aisle = known?.aisle && aisles.some((a) => a.id === known.aisle) ? known.aisle : guessAisle(n, aisles)
+    const aisle = known?.aisle ? knownAisle(aisles, known.aisle, n) : guessAisle(n, aisles)
     api.addItem(list.id, user, { name: n, quantity, aisle })
     return true
   }

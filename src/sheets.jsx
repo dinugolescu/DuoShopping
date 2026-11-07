@@ -22,12 +22,19 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
   const [gift, setGift] = useState(false)
   const giftList = isGiftList(current)
   const [rename, setRename] = useState(current?.name || '')
-  const canDelete = current && (current.ownerUid === user.uid || admin)
+  // Doar cine a creat lista o șterge de aici. Adminul șterge listele altora din panoul de admin.
+  const canDelete = current && current.ownerUid === user.uid
+  const toast = useToast()
 
   async function del() {
     if (!window.confirm(t('deleteListConfirm', current.name))) return
-    await api.deleteList(current.id)
-    onClose()
+    try {
+      await api.deleteList(current.id)
+      onClose()
+    } catch (e) {
+      console.error(e)
+      toast(`${t('deleteListFailed')} ${errText(e) || ''}`.trim())
+    }
   }
 
   return (

@@ -263,6 +263,7 @@ export default {
   // Previzualizarea după dictare (sau după mai multe produse scrise cu virgulă)
   previewTitle: 'Ce am înțeles',
   addAnyway: 'Adaugă totuși',
+  deleteListFailed: 'Lista nu s-a putut șterge.',
   aislesOldSet: 'Lista folosește raioanele de dinainte. Setul nou e mai general și are loc și pentru țigări, electronice, rechizite, haine și cadouri.',
   aislesUpgrade: 'Treci pe raioanele noi',
   aislesUpgradeConfirm: 'Raioanele implicite se înlocuiesc cu cele noi (numele și ordinea lor revin la cele implicite). Raioanele adăugate de voi rămân, iar produsele își găsesc singure locul. Apasă apoi Salvează.',

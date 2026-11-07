@@ -103,6 +103,28 @@ function fromDoc(d) {
 }
 const mapSnap = (cb) => (snap) => cb(snap.docs.map(fromDoc))
 
+// Ascultă o colecție dintr-o listă. Pe o listă abia creată, serverul poate primi cererea înaintea listei
+// și o refuză (regulile citesc lista ca să vadă cine e membru). Reîncercăm de câteva ori, cu pauze tot mai
+// mari, și arătăm eroarea abia dacă refuzul rămâne.
+function listen(q, cb, onError) {
+  let unsub = () => {}
+  let stopped = false
+  let tries = 0
+  let timer
+  const start = () => {
+    unsub = onSnapshot(q, (snap) => { tries = 0; cb(snap.docs.map(fromDoc)) }, (e) => {
+      if (e?.code === 'permission-denied' && tries < 6 && !stopped) {
+        tries += 1
+        timer = setTimeout(start, 700 * tries)
+        return
+      }
+      onError?.(e)
+    })
+  }
+  start()
+  return () => { stopped = true; clearTimeout(timer); unsub() }
+}
+
 const listsCol = collection(db, 'lists')
 const listDoc = (id) => doc(db, 'lists', id)
 const itemsCol = (listId) => collection(db, 'lists', listId, 'items')
@@ -213,13 +235,13 @@ export function setReceives(listId, email, receives) {
 export function watchItems(listId, cb, onError) {
   // Fără orderBy în query: sortăm în aplicație, ca să nu fie nevoie de index compus.
   const q = query(itemsCol(listId), where('archived', '==', false))
-  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
+  return listen(q, cb, onError)
 }
 
 // Cine primește cadouri citește doar dorințele adăugate de el.
 export function watchWishes(listId, uid, cb, onError) {
   const q = query(itemsCol(listId), where('addedBy.uid', '==', uid))
-  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
+  return listen(q, cb, onError)
 }
 
 // `catalog: false` (lista de cadouri): produsul nu intră în sugestii.
@@ -276,7 +298,7 @@ export function setStatus(listId, itemId, user, status, reason = null, reasonTex
 // ---------- Partea ascunsă a listei de cadouri (doar pentru cei care cumpără) ----------
 
 export function watchSecret(listId, cb, onError) {
-  return onSnapshot(secretCol(listId), mapSnap(cb), (e) => onError?.(e))
+  return listen(secretCol(listId), cb, onError)
 }
 
 // status: 'pending' | 'reserved' („Iau eu”) | 'bought'
@@ -318,18 +340,18 @@ async function dropPhotos(listId, items) {
 // Istoricul: produsele arhivate, cele mai recente întâi (are nevoie de indexul din firestore.indexes.json).
 export function watchHistory(listId, cb, onError) {
   const q = query(itemsCol(listId), where('archived', '==', true), orderBy('resolvedAt', 'desc'), limit(200))
-  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
+  return listen(q, cb, onError)
 }
 
 export function watchProducts(listId, cb) {
-  return onSnapshot(productsCol(listId), mapSnap(cb), (e) => console.error(e))
+  return listen(productsCol(listId), cb, (e) => console.error(e))
 }
 
 // ---------- Discuția unui produs ----------
 
 export function watchMessages(listId, itemId, cb, onError, scope) {
   const q = query(msgsCol(listId, itemId, scope), orderBy('at'))
-  return onSnapshot(q, mapSnap(cb), (e) => onError?.(e))
+  return listen(q, cb, onError)
 }
 
 // Contorul de mesaje stă pe produs (discuția obișnuită) sau pe partea lui ascunsă (scope 'secret').

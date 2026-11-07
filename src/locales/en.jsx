@@ -265,6 +265,7 @@ export default {
   markedAnnounced: (n) => (n === 1 ? 'Marked as announced' : `${n} marked as announced`),
   previewTitle: 'What I understood',
   addAnyway: 'Add anyway',
+  deleteListFailed: "The list couldn't be deleted.",
   aislesOldSet: 'This list uses the old aisles. The new set is more general and also has room for cigarettes, electronics, school supplies, clothes and gifts.',
   aislesUpgrade: 'Switch to new aisles',
   aislesUpgradeConfirm: 'The default aisles are replaced with the new ones (their names and order go back to the defaults). Aisles you added stay, and items find their new place on their own. Then tap Save.',

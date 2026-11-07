@@ -215,7 +215,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     <div className="add-wrap">
       <form className="add" onSubmit={submit}>
         <input ref={ref} className="add-name" value={name} onChange={(e) => setName(e.target.value)}
-          placeholder="Ce trebuie cumpărat?" maxLength={120} enterKeyHint="done" autoComplete="off" aria-label="Produs" />
+          placeholder={listening ? 'Te ascult…' : 'Ce trebuie cumpărat?'} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label="Produs" />
         <input className="add-qty" value={qty} onChange={(e) => setQty(e.target.value)}
           placeholder="Cant." maxLength={20} enterKeyHint="done" autoComplete="off" aria-label="Cantitate" />
         {speechSupported() && (listening || !name.trim()) ? (

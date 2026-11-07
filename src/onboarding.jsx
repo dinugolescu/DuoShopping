@@ -22,6 +22,13 @@ export const device = {
   iosOtherBrowser: /CriOS|FxiOS|EdgiOS/.test(ua),
 }
 device.mobile = device.ios || device.android
+// Pe Android instalăm doar din Chrome: din alte browsere (Samsung Internet, Firefox, Opera…) aplicația
+// instalată poate fi blocată de telefon ca „aplicație nesigură”. Linkurile din WhatsApp se deschid în
+// browserul implicit, care pe Samsung e de obicei Samsung Internet.
+device.androidOtherBrowser = device.android && !device.inApp
+  && (!/Chrome\//.test(ua) || /SamsungBrowser|OPR\/|Opera|EdgA|YaBrowser|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|VivoBrowser|UCBrowser|DuckDuckGo|Brave/i.test(ua))
+// Browserul în care nu se poate instala cum trebuie: trebuie deschis linkul în Safari sau Chrome.
+device.wrongBrowser = device.inApp || device.androidOtherBrowser
 
 export const isInstalled = () =>
   window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
@@ -50,15 +57,20 @@ function useInstallPrompt() {
 
 // ---------- Invitația ----------
 
+// Merge și pentru cine are deja aplicația (nu putem ști dinainte), și pentru cine o instalează acum.
 export function inviteText({ fromName, email, listName }) {
-  const why = listName ? `ca să vezi lista noastră „${listName}”` : 'ca să-ți faci propria listă de cumpărături, comună cu familia'
+  const who = firstName(fromName)
+  const head = listName
+    ? [`${who} te-a adăugat în lista „${listName}” din DuoShopping.`, '', 'Dacă ai deja aplicația, deschide-o: lista apare acolo.', 'Dacă nu o ai încă:']
+    : [`${who} te-a invitat în DuoShopping, lista de cumpărături comună a familiei.`, '', 'Dacă ai deja aplicația, ai acum acces și îți poți face liste noi. Dacă nu o ai încă:']
   return [
-    `${firstName(fromName)} te-a invitat în DuoShopping, ${why}.`,
-    '',
+    ...head,
     `1. Deschide linkul: ${APP_URL}`,
     '   Pe iPhone deschide-l în Safari, pe Android în Chrome (nu în browserul din WhatsApp sau Facebook).',
     '2. Alege iconița și pune aplicația pe ecranul principal, cum îți arată pagina.',
     `3. Deschide DuoShopping de pe ecran, apasă „Intră cu Google” și alege contul ${email}.`,
+    '',
+    `Invitația e doar pentru adresa ${email}. Ca să intre și altcineva din familie, îl inviți din aplicație, pe adresa lui.`,
   ].join('\n')
 }
 
@@ -128,7 +140,7 @@ export function InstallSheet({ onClose }) {
       <p className="muted small">
         Instalată, DuoShopping se deschide pe tot ecranul, ca o aplicație obișnuită, și poate primi notificări.
       </p>
-      {!isInstalled() && !device.inApp && device.mobile && (
+      {!isInstalled() && !device.wrongBrowser && device.mobile && (
         <>
           <h3>Alege întâi iconița</h3>
           <IconPicker />
@@ -153,6 +165,7 @@ function InstallSteps({ onInstalled }) {
 
   if (isInstalled()) return <p>Aplicația e deja instalată pe acest telefon.</p>
   if (device.inApp) return <InAppSteps />
+  if (device.androidOtherBrowser) return <OtherBrowserSteps />
   if (device.ios) {
     return (
       <ol className="steps">
@@ -197,8 +210,11 @@ export function Welcome({ logo, onContinue }) {
         <li><span aria-hidden="true">🛒</span> Produsele se așază singure pe raioane, în ordinea magazinului tău.</li>
         <li><span aria-hidden="true">💬</span> Discuții și poze la fiecare produs: „care marcă?”, „asta?”.</li>
       </ul>
-      {device.inApp ? (
-        <div className="warn-box"><b>Deschide linkul în {device.ios ? 'Safari' : 'Chrome'}</b><InAppSteps /></div>
+      {device.wrongBrowser ? (
+        <div className="warn-box">
+          <b>Deschide linkul în {device.ios ? 'Safari' : 'Chrome'}</b>
+          {device.inApp ? <InAppSteps /> : <OtherBrowserSteps />}
+        </div>
       ) : (
         <div className="welcome-steps">
           <h3>1. Alege iconița</h3>
@@ -216,11 +232,37 @@ export function Welcome({ logo, onContinue }) {
   )
 }
 
-function InAppSteps() {
+function useCopyLink() {
   const toast = useToast()
-  async function copy() {
+  return async () => {
     try { await navigator.clipboard.writeText(APP_URL); toast('Link copiat') } catch { toast(APP_URL) }
   }
+}
+
+// Link care deschide pagina direct în Chrome, pe Android (merge din Samsung Internet și majoritatea browserelor).
+function chromeIntentUrl() {
+  const u = new URL(APP_URL)
+  return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=com.android.chrome;end`
+}
+
+// Android, dar alt browser decât Chrome.
+function OtherBrowserSteps() {
+  const copy = useCopyLink()
+  return (
+    <>
+      <ol className="steps">
+        <li>Ești în alt browser decât Chrome. Instalată de aici, aplicația poate fi blocată de telefon ca „nesigură”.</li>
+        <li>Apasă <b>„Deschide în Chrome”</b> și continuă de acolo.</li>
+        <li>Dacă nu merge, copiază linkul și lipește-l în Chrome.</li>
+      </ol>
+      <a className="btn primary wide" href={chromeIntentUrl()}>Deschide în Chrome</a>
+      <button className="btn wide" onClick={copy}>Copiază linkul</button>
+    </>
+  )
+}
+
+function InAppSteps() {
+  const copy = useCopyLink()
   return (
     <>
       <ol className="steps">

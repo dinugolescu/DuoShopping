@@ -17,7 +17,7 @@ export const FONTS = [
   { id: 'hand', label: 'Patrick Hand (scris de mână)', css: '"Patrick Hand", cursive', google: 'Patrick+Hand' },
 ]
 
-const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [] }
+const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [], personalLists: [] }
 const KEY = 'cumparaturi-prefs'
 
 function load() {

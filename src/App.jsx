@@ -105,15 +105,9 @@ function Home({ user, admin }) {
   const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
 
   useEffect(() => startPrefsSync(user.uid, api), [user.uid])
-  useEffect(() => api.watchLists(user, (ls, meta) => {
-    setLists(ls)
-    // Prima intrare: cine n-are nicio listă primește una gata făcută. O singură dată per cont,
-    // și doar după ce serverul confirmă (din cache, la început, lista poate părea goală).
-    const key = `prima-lista-${user.uid}`
-    if (meta?.fromCache || store.get(key)) return
-    store.set(key, true)
-    if (ls.length === 0) setCurrentId(api.createList(user, FIRST_LIST))
-  }, (e) => toast(errText(e))), [user.uid, user.email, toast])
+  // Nu mai facem automat o listă la prima intrare: cine e invitat de familie ar fi ajuns cu două
+  // liste „Cumpărături”. Cine n-are nicio listă vede ecranul gol, cu „Începe lista”.
+  useEffect(() => api.watchLists(user, setLists, (e) => toast(errText(e))), [user.uid, user.email, toast])
 
   // Ordinea listelor e personală: întâi cele ordonate de tine, apoi restul în ordinea creării.
   const sorted = lists && [...lists].sort((a, b) => {
@@ -132,8 +126,14 @@ function Home({ user, admin }) {
     setPref('listOrder', ids)
   }
 
-  const create = (name) => setCurrentId(api.createList(user, name))
+  // După crearea unei liste întrebăm imediat cu cine o împarte.
+  const create = (name) => { setCurrentId(api.createList(user, name)); setSheet('share-new') }
   const close = () => setSheet(null)
+
+  // Lista în care ești singur: scoatem în evidență invitarea, dacă n-ai spus că e personală.
+  const personal = usePrefs().personalLists || []
+  const alone = current && current.memberEmails.length === 1 && !personal.includes(current.id)
+  const markPersonal = () => setPref('personalLists', [...personal.filter((id) => lists.some((l) => l.id === id)), current.id])
 
   if (!sorted) return <div className="center muted">Se încarcă listele…</div>
 
@@ -150,14 +150,22 @@ function Home({ user, admin }) {
           </button>
         )}
         {current && (
-          <button className="icon-btn" onClick={() => setSheet('share')} aria-label="Cine vede lista">
+          <button className={`icon-btn ${alone ? 'alone' : ''}`} onClick={() => setSheet('share')}
+            aria-label={alone ? 'Doar tu vezi lista. Invită pe cineva' : 'Cine vede lista'}>
             <IconUsers />
             {current.memberEmails.length > 1 && <span className="count">{current.memberEmails.length}</span>}
+            {alone && <span className="count alert" aria-hidden="true">!</span>}
           </button>
         )}
       </header>
 
       <InstallBanner onOpen={() => setSheet('install')} />
+      {alone && (
+        <div className="hint-bar alone-bar">
+          <button className="grow hint-main" onClick={() => setSheet('share')}>👤 Doar tu vezi lista asta. <b>Invită pe cineva</b></button>
+          <button className="btn small" onClick={markPersonal}>E personală</button>
+        </div>
+      )}
       {current && tipsDone && <PushPrompt user={user} />}
       {current && !tipsDone && <Tips onDone={() => setTipsDone(true)} />}
       {current
@@ -168,13 +176,14 @@ function Home({ user, admin }) {
         <MenuSheet
           user={user} admin={admin} lists={sorted} current={current}
           onPick={(id) => { setCurrentId(id); close() }}
-          onCreate={(name) => { create(name); close() }}
+          onCreate={create}
           onMove={move}
           onOpen={setSheet}
           onClose={close}
         />
       )}
       {sheet === 'share' && current && <ShareSheet list={current} user={user} admin={admin} onClose={close} />}
+      {sheet === 'share-new' && current?.id === currentId && <ShareSheet list={current} user={user} admin={admin} fresh onClose={close} />}
       {sheet === 'settings' && <SettingsSheet user={user} onClose={close} />}
       {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} onClose={close} />}
       {sheet === 'admin' && admin && <AdminSheet user={user} onClose={close} />}
@@ -192,7 +201,8 @@ function EmptyLists({ user, onCreate, onMenu }) {
     <main className="empty">
       <h2>Nicio listă încă</h2>
       <p className="muted">
-        Creează o listă nouă sau roagă pe cineva să te invite pe adresa <b>{user.email}</b>.
+        Dacă cineva din familie are deja o listă, roagă-l să te invite pe adresa <b>{user.email}</b>:
+        lista apare aici singură. Altfel, începe tu una și invită-i pe ceilalți.
       </p>
       <form className="row" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onCreate(name) }}>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Numele listei" maxLength={60} />

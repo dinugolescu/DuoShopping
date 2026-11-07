@@ -84,7 +84,7 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
 
 // ---------- Cine vede lista ----------
 
-export function ShareSheet({ list, user, admin, onClose }) {
+export function ShareSheet({ list, user, admin, fresh, onClose }) {
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [invited, setInvited] = useState(null)
@@ -113,7 +113,12 @@ export function ShareSheet({ list, user, admin, onClose }) {
   }
 
   return (
-    <Sheet title={`Cine vede „${list.name}”`} onClose={onClose}>
+    <Sheet title={fresh ? `Cu cine împarți „${list.name}”?` : `Cine vede „${list.name}”`} onClose={onClose}>
+      {fresh && (
+        <p className="muted small">
+          Lista e nouă și o vezi doar tu. Invită pe cine trebuie să vadă produsele, sau închide dacă e doar pentru tine.
+        </p>
+      )}
       <ul className="members">
         {list.memberEmails.map((m) => (
           <li key={m}>

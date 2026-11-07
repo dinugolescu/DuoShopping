@@ -9,16 +9,23 @@ export const speechSupported = () => !!SR
 const SILENCE_MS = 1800 // după atâta liniște considerăm că omul a terminat de spus
 const NOTHING_MS = 7000 // dacă nu vine nimic în atât timp, recunoașterea nu merge (se întâmplă pe iPhone)
 
-// Textul apare pe măsură ce vorbești (onPartial); la final primim tot ce s-a spus (onFinal).
+// Chrome pe Android, cu ascultare continuă și text parțial, trimite aceleași bucăți de mai multe ori
+// („lapte lapte și carne lapte…”). Acolo ascultăm o singură frază și primim textul doar la sfârșit.
+const ANDROID = typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent)
+export const liveText = !ANDROID
+
+// Pe iPhone textul apare pe măsură ce vorbești (onPartial); pe Android doar la sfârșit.
+// La final primim tot ce s-a spus (onFinal).
 export function listen({ onPartial, onFinal, onError, onEnd }) {
   const r = new SR()
   r.lang = 'ro-RO'
-  r.interimResults = true
-  r.continuous = true
+  r.interimResults = liveText
+  r.continuous = liveText
   r.maxAlternatives = 1
   let text = ''
   let silence
-  const watchdog = setTimeout(() => { if (!text) { r.abort(); onError('no-result') } }, NOTHING_MS)
+  // Pe Android textul vine abia la final, deci nu putem ști din timp că recunoașterea nu merge.
+  const watchdog = liveText && setTimeout(() => { if (!text) { r.abort(); onError('no-result') } }, NOTHING_MS)
   r.onresult = (e) => {
     text = Array.from(e.results).map((x) => x[0].transcript).join(' ').replace(/\s+/g, ' ').trim()
     onPartial(text)

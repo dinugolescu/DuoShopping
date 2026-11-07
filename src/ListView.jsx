@@ -14,6 +14,7 @@ import { t } from './i18n.jsx'
 
 const SEEN_KEY = 'mesaje-vazute'
 const KEYBOARD_VOICE_KEY = 'voce-prin-tastatura'
+export const sameProduct = (a, b) => normalize(a.name) === normalize(b.name) && normalize(a.quantity || '') === normalize(b.quantity || '')
 const itemAisle = (i, aisles) => aisleIn(aisles, i.aisle || guessAisle(i.name, aisles))
 
 export function ListView({ list, user }) {
@@ -52,10 +53,15 @@ export function ListView({ list, user }) {
     toast(text, () => api.setStatus(list.id, item.id, user, ...prev))
   }
 
-  function add({ name, quantity = '' }, quiet = false) {
+  // Același produs cu aceeași cantitate e deja pe listă; cu altă cantitate sau marcă („Țigări · Kent”)
+  // e alt produs. Un duplicat adevărat se poate adăuga totuși, din toast.
+  function add({ name, quantity = '' }, quiet = false, force = false) {
     const n = name.trim()
-    const dup = pending.find((i) => normalize(i.name) === normalize(n))
-    if (dup) { if (!quiet) toast(t('alreadyOnList', dup.name)); return false }
+    const dup = !force && pending.find((i) => sameProduct(i, { name: n, quantity }))
+    if (dup) {
+      if (!quiet) toast(t('alreadyOnList', dup.name), () => add({ name: n, quantity }, true, true), t('addAnyway'))
+      return false
+    }
     const known = productMap.get(productKey(n))
     const aisle = known?.aisle && aisles.some((a) => a.id === known.aisle) ? known.aisle : guessAisle(n, aisles)
     api.addItem(list.id, user, { name: n, quantity, aisle })
@@ -67,7 +73,7 @@ export function ListView({ list, user }) {
     const seen = new Set()
     const added = [], already = []
     for (const p of products) {
-      const k = normalize(p.name)
+      const k = `${normalize(p.name)}|${normalize(p.quantity || '')}`
       if (seen.has(k)) continue
       seen.add(k)
       ;(add(p, true) ? added : already).push(p.name)
@@ -155,7 +161,7 @@ export function ListView({ list, user }) {
   )
 }
 
-function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
+export function AddForm({ onAdd, onAddMany, products, pending, enabled, placeholder }) {
   const toast = useToast()
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
@@ -224,7 +230,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     <div className="add-wrap">
       <form className="add" onSubmit={submit}>
         <input ref={ref} className="add-name" value={name} onChange={(e) => setName(e.target.value)}
-          placeholder={listening ? t('listening') : t('addPh')} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label={t('productLabel')} />
+          placeholder={listening ? t('listening') : placeholder || t('addPh')} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label={t('productLabel')} />
         <input className="add-qty" value={qty} onChange={(e) => setQty(e.target.value)}
           placeholder={t('qtyPh')} maxLength={20} enterKeyHint="done" autoComplete="off" aria-label={t('qtyLabel')} />
         {speechSupported() && (listening || !name.trim()) ? (
@@ -257,11 +263,11 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
 // înainte să ajungă pe listă. Cele deja pe listă sunt marcate și nu se adaugă din nou.
 function PreviewSheet({ found, pending, onAdd, onClose }) {
   const [rows, setRows] = useState(() => found.map((p, i) => ({ ...p, key: i })))
-  const onList = new Set(pending.map((i) => normalize(i.name)))
+  const isDup = (r) => r.name.trim() && pending.some((i) => sameProduct(i, r))
   const change = (key, patch) => setRows((r) => r.map((x) => (x.key === key ? { ...x, ...patch } : x)))
   const remove = (key) => setRows((r) => r.filter((x) => x.key !== key))
   const valid = rows.filter((r) => r.name.trim())
-  const fresh = valid.filter((r) => !onList.has(normalize(r.name)))
+  const fresh = valid.filter((r) => !isDup(r))
 
   function submit(e) {
     e.preventDefault()
@@ -275,7 +281,7 @@ function PreviewSheet({ found, pending, onAdd, onClose }) {
         {rows.length ? (
           <ul className="preview-items">
             {rows.map((r) => {
-              const dup = r.name.trim() && onList.has(normalize(r.name))
+              const dup = isDup(r)
               return (
                 <li key={r.key} className={dup ? 'dup' : ''}>
                   <input className="p-name" value={r.name} onChange={(e) => change(r.key, { name: e.target.value })}

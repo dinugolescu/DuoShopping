@@ -8,7 +8,8 @@ import { Sheet, firstName, useNow, useToast, errText, useBackClose } from './ui.
 import { IconCamera, IconSend, IconX } from './icons.jsx'
 import { t } from './i18n.jsx'
 
-export function ChatSheet({ list, item, user, onClose }) {
+// `scope` 'secret': discuția doar între cei care cumpără, pe o listă de cadouri.
+export function ChatSheet({ list, item, user, onClose, scope }) {
   const toast = useToast()
   const now = useNow()
   const [msgs, setMsgs] = useState(null)
@@ -20,7 +21,7 @@ export function ChatSheet({ list, item, user, onClose }) {
   const endRef = useRef()
   const fileRef = useRef()
 
-  useEffect(() => api.watchMessages(list.id, item.id, setMsgs, (e) => toast(errText(e))), [list.id, item.id, toast])
+  useEffect(() => api.watchMessages(list.id, item.id, setMsgs, (e) => toast(errText(e)), scope), [list.id, item.id, toast, scope])
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }) }, [msgs?.length])
 
   async function choosePhoto(e) {
@@ -34,25 +35,25 @@ export function ChatSheet({ list, item, user, onClose }) {
   function send(e) {
     e.preventDefault()
     if (!text.trim() && !photo) return
-    api.sendMessage(list.id, item.id, user, { text, photo })
+    api.sendMessage(list.id, item.id, user, { text, photo }, scope)
     setText('')
     setPhoto(null)
   }
 
   function react(m, r) {
     const mine = (m.reactions?.[r.id] || []).includes(user.uid)
-    api.toggleReaction(list.id, item.id, m.id, r.id, user.uid, !mine)
+    api.toggleReaction(list.id, item.id, m.id, r.id, user.uid, !mine, scope)
     setActiveId(null)
   }
 
   function remove(m) {
     if (!window.confirm(t('deleteMsgConfirm'))) return
-    api.deleteMessage(list.id, item.id, m.id)
+    api.deleteMessage(list.id, item.id, m.id, scope)
     setActiveId(null)
   }
 
   return (
-    <Sheet title={t('chatTitle', item.name)} onClose={onClose} className="chat">
+    <Sheet title={t(scope === 'secret' ? 'secretChatTitle' : 'chatTitle', item.name)} onClose={onClose} className="chat">
       <div className="chat-msgs">
         {msgs === null && <p className="center muted">{t('loading')}</p>}
         {msgs?.length === 0 && <p className="center muted pad small">{t('chatEmpty')}</p>}

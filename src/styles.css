@@ -540,3 +540,20 @@ a.btn.primary { color: var(--accent-text); }
 /* Microfonul din câmpul de adăugare */
 .add-btn.mic.listening { animation: mic-pulse 1.1s ease-in-out infinite; }
 @keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px var(--accent-soft); } }
+
+/* Lista de cadouri */
+.gift-hint { margin: 10px 12px 0; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-size: 14px; line-height: 1.4; }
+.gift-for { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 12px 0; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.item.gift { align-items: flex-start; }
+.gift-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.gift-icons { display: flex; gap: 2px; }
+.gift-status { font-size: 13px; font-weight: 600; color: var(--skip); }
+.gift-status.done { color: var(--accent); }
+.item.gift.bought .item-name { text-decoration: line-through; color: var(--muted); }
+.item-meta.warn { color: var(--skip); }
+.item-name .badge { margin-left: 6px; }
+.pad-x { padding: 0 16px; }
+.check-line { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; cursor: pointer; }
+.check-line input { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+a.chat-btn { color: inherit; display: inline-grid; place-items: center; }

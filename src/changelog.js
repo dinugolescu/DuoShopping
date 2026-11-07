@@ -6,10 +6,14 @@ export const CHANGELOG = [
   {
     v: '2.0', date: '2026-11-07',
     ro: [
+      'Liste de cadouri: unii își scriu dorințele, alții le cumpără pe ascuns. Cine primește cadouri nu vede ce s-a luat; cei care cumpără au „Iau eu”, idei ascunse și o discuție doar a lor.',
+      'Același produs poate apărea de două ori pe listă, cu altă cantitate sau marcă, sau cu „Adaugă totuși”.',
       'Pagina asta, cu ce s-a schimbat de la o versiune la alta.',
       'Cine mai deschide aplicația de pe adresa veche ajunge singur pe cea nouă.',
     ],
     en: [
+      'Gift lists: some write their wishes, others buy them in secret. Whoever receives gifts can’t see what was bought; buyers get “I’ll get it”, hidden ideas and a chat of their own.',
+      'The same item can be on the list twice, with a different amount or brand, or with “Add anyway”.',
       'This page, showing what changed from one version to the next.',
       'Anyone still opening the app from the old address is taken to the new one.',
     ],

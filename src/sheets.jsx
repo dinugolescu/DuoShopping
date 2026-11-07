@@ -10,6 +10,7 @@ import { reasonLabel } from './config.js'
 import { InviteShare, isInstalled, IconPicker, LangPicker } from './onboarding.jsx'
 import { t, locale } from './i18n.jsx'
 import { CHANGELOG, VERSION, changes } from './changelog.js'
+import { isGiftList, receivesIn, watchGiftItems } from './gifts.js'
 
 const people = (n) => t('people', n)
 const products = (n) => t('products', n)
@@ -18,6 +19,8 @@ const products = (n) => t('products', n)
 
 export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMove, onOpen, onClose }) {
   const [newName, setNewName] = useState('')
+  const [gift, setGift] = useState(false)
+  const giftList = isGiftList(current)
   const [rename, setRename] = useState(current?.name || '')
   const canDelete = current && (current.ownerUid === user.uid || admin)
 
@@ -34,7 +37,7 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
           <div key={l.id} className="choice-row">
             <button className={`choice grow ${l.id === current?.id ? 'active' : ''}`} onClick={() => onPick(l.id)}>
               <span>{l.name}</span>
-              <span className="muted small">{products(l.itemCount)} · {people(l.memberEmails.length)}</span>
+              <span className="muted small">{receivesIn(l, user) ? t('giftListOption') : products(l.itemCount)} · {people(l.memberEmails.length)}</span>
             </button>
             {lists.length > 1 && (
               <div className="order-btns">
@@ -45,10 +48,14 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
           </div>
         ))}
       </div>
-      <form className="row" onSubmit={(e) => { e.preventDefault(); if (newName.trim()) onCreate(newName) }}>
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('newListPh')} maxLength={60} />
+      <form className="row" onSubmit={(e) => { e.preventDefault(); if (newName.trim()) onCreate(newName, gift ? 'gifts' : undefined) }}>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={gift ? t('newGiftListPh') : t('newListPh')} maxLength={60} />
         <button className="btn" disabled={!newName.trim()}>{t('create')}</button>
       </form>
+      <label className="check-line">
+        <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} />
+        <span>{t('giftListOption')} <span className="muted small block">{t('giftListOptionHint')}</span></span>
+      </label>
 
       {current && (
         <>
@@ -57,8 +64,8 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
             <input value={rename} onChange={(e) => setRename(e.target.value)} maxLength={60} aria-label={t('listNameLabel')} />
             <button className="btn" disabled={!rename.trim() || rename.trim() === current.name}>{t('rename')}</button>
           </form>
-          <button className="btn wide" onClick={() => onOpen('aisles')}>{t('listAisles')}</button>
-          <button className="btn wide" onClick={() => onOpen('history')}>{t('shoppingHistory')}</button>
+          {!giftList && <button className="btn wide" onClick={() => onOpen('aisles')}>{t('listAisles')}</button>}
+          {!giftList && <button className="btn wide" onClick={() => onOpen('history')}>{t('shoppingHistory')}</button>}
           {canDelete && <button className="btn danger wide" onClick={del}>{t('deleteList')}</button>}
         </>
       )}
@@ -90,27 +97,31 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [invited, setInvited] = useState(null)
+  const [receives, setReceives] = useState(false) // lista de cadouri: rolul celui invitat
   const isOwner = list.ownerUid === user.uid
   const canRemove = isOwner || admin
+  const gift = isGiftList(list)
+  const iReceive = receivesIn(list, user)
+  const recipients = list.recipients || []
 
   function submit(e) {
     e.preventDefault()
     const v = email.trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast(t('invalidEmail')); return }
     if (list.memberEmails.includes(v)) { toast(t('alreadyMember')); return }
-    api.invite(list, user, v)
+    api.invite(list, user, v, gift && receives)
     setEmail('')
     setInvited(v)
   }
 
   function kick(m) {
     if (!window.confirm(t('kickConfirm', m, list.name))) return
-    api.removeMember(list.id, m)
+    api.removeMember(list, m)
   }
 
   function leave() {
     if (!window.confirm(t('leaveConfirm', list.name))) return
-    api.leaveList(list.id, user)
+    api.leaveList(list, user)
     onClose()
   }
 
@@ -123,22 +134,40 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
             <span className="grow">
               {m}{m === user.email && <span className="muted">{t('youMark')}</span>}
               {m === list.ownerEmail && <span className="badge">{t('listCreator')}</span>}
+              {gift && !iReceive && (
+                <span className="muted small block">{recipients.includes(m) ? t('roleReceives') : t('roleBuys')}</span>
+              )}
             </span>
+            {gift && isOwner && m !== list.ownerEmail && (
+              <button className="btn small" onClick={() => api.setReceives(list.id, m, !recipients.includes(m))}>
+                {recipients.includes(m) ? t('makeBuyer') : t('makeReceiver')}
+              </button>
+            )}
             {canRemove && m !== list.ownerEmail && m !== user.email && (
               <button className="btn small danger" onClick={() => kick(m)}>{t('remove')}</button>
             )}
           </li>
         ))}
       </ul>
-      <form className="row" onSubmit={submit}>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('emailPh')}
-          autoComplete="off" autoCapitalize="off" aria-label={t('inviteEmailLabel')} />
-        <button className="btn primary" disabled={!email.trim()}>{t('invite')}</button>
-      </form>
-      <p className="muted small">
-        {t('shareHint')}
-        {!canRemove && t('onlyOwnerRemoves')}
-      </p>
+      {!iReceive && (
+        <>
+          {gift && (
+            <div className="segmented" role="radiogroup" aria-label={t('inviteRole')}>
+              <button type="button" role="radio" aria-checked={!receives} className={!receives ? 'on' : ''} onClick={() => setReceives(false)}>{t('roleBuys')}</button>
+              <button type="button" role="radio" aria-checked={receives} className={receives ? 'on' : ''} onClick={() => setReceives(true)}>{t('roleReceives')}</button>
+            </div>
+          )}
+          <form className="row" onSubmit={submit}>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('emailPh')}
+              autoComplete="off" autoCapitalize="off" aria-label={t('inviteEmailLabel')} />
+            <button className="btn primary" disabled={!email.trim()}>{t('invite')}</button>
+          </form>
+          <p className="muted small">
+            {gift ? t('giftShareHint') : t('shareHint')}
+            {!canRemove && t('onlyOwnerRemoves')}
+          </p>
+        </>
+      )}
       {invited && <InviteShare user={user} email={invited} listName={list.name} />}
       {!isOwner && list.memberEmails.includes(user.email) && (
         <button className="btn danger wide" onClick={leave}>{t('leaveList')}</button>
@@ -337,7 +366,8 @@ export function useAnnounce(list, user) {
   const [states, setStates] = useState(null)
   useEffect(() => {
     setItems(null)
-    return list ? api.watchItems(list.id, setItems) : undefined
+    if (!list) return undefined
+    return isGiftList(list) ? watchGiftItems(list.id, setItems) : api.watchItems(list.id, setItems)
   }, [list?.id])
   useEffect(() => api.watchAnnounced(user.uid, setStates), [user.uid])
   if (!list || !items || !states) return { pending: null, mark: () => {} }

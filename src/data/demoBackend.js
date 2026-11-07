@@ -15,7 +15,7 @@ export const DEMO_USERS = [
 const DB_KEY = 'cumparaturi-demo-db-v3'
 const USER_KEY = 'cumparaturi-demo-user' // sessionStorage: fiecare tab poate avea alt utilizator
 
-const empty = () => ({ lists: {}, items: {}, products: {}, messages: {}, allowed: {}, announced: {}, admins: { 'dinu@demo.ro': true } })
+const empty = () => ({ lists: {}, items: {}, products: {}, messages: {}, allowed: {}, announced: {}, secret: {}, admins: { 'dinu@demo.ro': true } })
 function load() {
   try { return { ...empty(), ...JSON.parse(localStorage.getItem(DB_KEY)) } } catch { return empty() }
 }
@@ -87,10 +87,13 @@ export function watchLists(user, cb) {
   return watch((db) => Object.values(db.lists).filter((l) => l.memberEmails.includes(user.email)), cb)
 }
 
-export function createList(user, name) {
+export function createList(user, name, kind) {
   const id = newId()
   mutate((db) => {
-    db.lists[id] = { id, name: name.trim(), ownerUid: user.uid, ownerEmail: user.email, memberEmails: [user.email], itemCount: 0, createdAt: Date.now() }
+    db.lists[id] = {
+      id, name: name.trim(), ownerUid: user.uid, ownerEmail: user.email, memberEmails: [user.email], itemCount: 0, createdAt: Date.now(),
+      ...(kind === 'gifts' ? { kind, recipients: [] } : {}),
+    }
   })
   return id
 }
@@ -101,8 +104,8 @@ export function renameList(listId, name) {
 
 export async function deleteList(listId) {
   mutate((db) => {
-    for (const itemId of Object.keys(db.items[listId] || {})) delete db.messages[itemId]
-    delete db.lists[listId]; delete db.items[listId]; delete db.products[listId]
+    for (const itemId of Object.keys(db.items[listId] || {})) { delete db.messages[itemId]; delete db.messages[`s:${itemId}`] }
+    delete db.lists[listId]; delete db.items[listId]; delete db.products[listId]; delete db.secret?.[listId]
   })
 }
 
@@ -119,11 +122,12 @@ export function setListAisles(listId, aisles) {
   mutate((db) => { db.lists[listId].aisles = aisles })
 }
 
-export function invite(list, user, email) {
+export function invite(list, user, email, receives = false) {
   const e = normEmail(email)
   mutate((db) => {
     const l = db.lists[list.id]
     if (!l.memberEmails.includes(e)) l.memberEmails.push(e)
+    if (receives && !l.recipients.includes(e)) l.recipients.push(e)
     db.allowed[e] = { email: e, invitedByEmail: user.email, at: Date.now() }
   })
 }
@@ -133,15 +137,24 @@ export function inviteToApp(user, email) {
   mutate((db) => { db.allowed[e] = { email: e, invitedByEmail: user.email, at: Date.now() } })
 }
 
-export function removeMember(listId, email) {
+export function removeMember(list, email) {
   const e = normEmail(email)
   mutate((db) => {
-    const l = db.lists[listId]
+    const l = db.lists[list.id]
     l.memberEmails = l.memberEmails.filter((m) => m !== e)
+    if (l.recipients) l.recipients = l.recipients.filter((m) => m !== e)
   })
 }
 
-export const leaveList = (listId, user) => removeMember(listId, user.email)
+export const leaveList = (list, user) => removeMember(list, user.email)
+
+export function setReceives(listId, email, receives) {
+  const e = normEmail(email)
+  mutate((db) => {
+    const l = db.lists[listId]
+    l.recipients = l.recipients.filter((m) => m !== e).concat(receives ? [e] : [])
+  })
+}
 
 // ---------- Produse ----------
 
@@ -156,14 +169,18 @@ function upsertProduct(db, listId, name, patch, bump) {
   db.products[listId][key] = { ...p, name, ...patch, count: p.count + (bump ? 1 : 0), ...(bump ? { lastAt: Date.now() } : {}) }
 }
 
-export function addItem(listId, user, fields) {
+export function watchWishes(listId, uid, cb) {
+  return watch((db) => Object.values(db.items[listId] || {}).filter((i) => i.addedBy?.uid === uid), cb)
+}
+
+export function addItem(listId, user, fields, { catalog = true } = {}) {
   const id = newId()
   mutate((db) => {
     const item = { id, ...newItemFields(user, fields), addedAt: Date.now() }
     db.items[listId] ??= {}
     db.items[listId][id] = item
     db.lists[listId].itemCount = (db.lists[listId].itemCount || 0) + 1
-    upsertProduct(db, listId, item.name, { quantity: item.quantity, aisle: item.aisle }, true)
+    if (catalog) upsertProduct(db, listId, item.name, { quantity: item.quantity, aisle: item.aisle }, true)
   })
   return id
 }
@@ -183,6 +200,8 @@ export async function deleteItem(listId, item) {
   mutate((db) => {
     delete db.items[listId][item.id]
     delete db.messages[item.id]
+    delete db.messages[`s:${item.id}`]
+    delete db.secret?.[listId]?.[item.id]
     if (!item.archived) db.lists[listId].itemCount = Math.max(0, (db.lists[listId].itemCount || 1) - 1)
   })
 }
@@ -195,6 +214,31 @@ export function setStatus(listId, itemId, user, status, reason = null, reasonTex
     reasonText: status === 'skipped' ? reasonText : '',
     resolvedBy: done ? who(user) : null,
     resolvedAt: done ? Date.now() : null,
+  })
+}
+
+// ---------- Partea ascunsă a listei de cadouri ----------
+
+export function watchSecret(listId, cb) {
+  return watch((db) => Object.values(db.secret?.[listId] || {}), cb)
+}
+
+function secretOf(db, listId, itemId) {
+  db.secret ??= {}
+  db.secret[listId] ??= {}
+  return (db.secret[listId][itemId] ??= { id: itemId })
+}
+
+export function setGiftStatus(listId, itemId, user, status) {
+  mutate((db) => {
+    const now = Date.now()
+    Object.assign(secretOf(db, listId, itemId), {
+      status,
+      reservedBy: status === 'pending' ? null : who(user),
+      reservedAt: status === 'pending' ? null : now,
+      resolvedBy: status === 'bought' ? who(user) : null,
+      resolvedAt: status === 'bought' ? now : null,
+    })
   })
 }
 
@@ -222,34 +266,39 @@ export function watchProducts(listId, cb) {
 
 // ---------- Discuția unui produs ----------
 
-export function watchMessages(listId, itemId, cb) {
-  return watch((db) => Object.values(db.messages[itemId] || {}).sort((a, b) => a.at - b.at), cb)
+// Mesajele discuției ascunse (scope 'secret') stau sub cheia `s:<id>`; contorul lor pe partea ascunsă.
+const msgKey = (itemId, scope) => (scope === 'secret' ? `s:${itemId}` : itemId)
+const counterOf = (db, listId, itemId, scope) => (scope === 'secret' ? secretOf(db, listId, itemId) : db.items[listId][itemId])
+
+export function watchMessages(listId, itemId, cb, onError, scope) {
+  return watch((db) => Object.values(db.messages[msgKey(itemId, scope)] || {}).sort((a, b) => a.at - b.at), cb)
 }
 
-export function sendMessage(listId, itemId, user, { text = '', photo = null }) {
+export function sendMessage(listId, itemId, user, { text = '', photo = null }, scope) {
   mutate((db) => {
     const id = newId()
     const at = Date.now()
-    db.messages[itemId] ??= {}
-    db.messages[itemId][id] = { id, text: text.trim(), photo, by: who(user), at, reactions: {} }
-    const it = db.items[listId][itemId]
+    const k = msgKey(itemId, scope)
+    db.messages[k] ??= {}
+    db.messages[k][id] = { id, text: text.trim(), photo, by: who(user), at, reactions: {} }
+    const it = counterOf(db, listId, itemId, scope)
     Object.assign(it, { msgCount: (it.msgCount || 0) + 1, lastMsgAt: at, lastMsgBy: user.uid })
   })
 }
 
-export function toggleReaction(listId, itemId, msgId, reactionId, uid, on) {
+export function toggleReaction(listId, itemId, msgId, reactionId, uid, on, scope) {
   mutate((db) => {
-    const m = db.messages[itemId][msgId]
+    const m = db.messages[msgKey(itemId, scope)][msgId]
     const set = new Set(m.reactions[reactionId] || [])
     on ? set.add(uid) : set.delete(uid)
     m.reactions[reactionId] = [...set]
   })
 }
 
-export function deleteMessage(listId, itemId, msgId) {
+export function deleteMessage(listId, itemId, msgId, scope) {
   mutate((db) => {
-    delete db.messages[itemId][msgId]
-    const it = db.items[listId][itemId]
+    delete db.messages[msgKey(itemId, scope)][msgId]
+    const it = counterOf(db, listId, itemId, scope)
     it.msgCount = Math.max(0, (it.msgCount || 1) - 1)
   })
 }

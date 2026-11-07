@@ -14,8 +14,13 @@ export const REACTIONS = [
   { id: 'no', emoji: '👎' },
 ]
 
-export function newItemFields(user, { name, quantity = '', note = '', aisle }) {
+// Pe lista de cadouri: `forEmail`/`forName` = pentru cine e dorința; `idea` = adăugată de cineva care
+// cumpără (cel care primește n-o vede).
+export function newItemFields(user, { name, quantity = '', note = '', aisle = null, link = '', forEmail = null, forName = '', idea = false }) {
   return {
+    ...(forEmail ? { for: forEmail, forName } : {}),
+    ...(idea ? { idea: true } : {}),
+    link: link.trim(),
     name: name.trim(),
     quantity: quantity.trim(),
     note: note.trim(),

@@ -38,7 +38,9 @@ export const announce = onCall(async (req) => {
   if (Date.now() - last < MIN_GAP_MS) throw new HttpsError('resource-exhausted', 'Ai trimis un anunț acum câteva secunde.')
   await logRef.set({ at: FieldValue.serverTimestamp() })
 
-  const others = list.memberEmails.filter((e) => e !== email)
+  // Pe o listă de cadouri, cei care primesc cadouri nu primesc anunțurile (ar strica surpriza).
+  const recipients = list.kind === 'gifts' ? list.recipients || [] : []
+  const others = list.memberEmails.filter((e) => e !== email && !recipients.includes(e))
   if (!others.length) return { phones: 0, withoutPhone: [] }
 
   const tokSnap = await db.collection('pushTokens').where('email', 'in', others.slice(0, 30)).get()

@@ -4,6 +4,17 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.2', date: '2026-11-08',
+    ro: [
+      'Notificările ajung pe telefonul cu aplicația de pe adresa nouă, iar atingerea lor deschide aplicația, nu browserul.',
+      'Telefonul își reverifică singur notificările la fiecare pornire, ca să nu se piardă (mai ales pe iPhone).',
+    ],
+    en: [
+      'Notifications reach the phone with the app from the new address, and tapping them opens the app, not the browser.',
+      'The phone re-checks its notifications on every start so they don’t get lost (especially on iPhone).',
+    ],
+  },
+  {
     v: '2.1', date: '2026-11-08',
     ro: [
       'Raioane noi, mai generale: Aprozar, Vicii, Drogerie, Electronice și bricolaj, Papetărie și rechizite, Haine și încălțăminte, Cadouri și flori. Țigările, becurile sau caietele nu mai ajung la „Altele”.',

@@ -349,7 +349,8 @@ export function IconPicker() {
 // ---------- Îndemn la notificări ----------
 // Fără notificări, celălalt nu află când ai terminat lista sau când ești la magazin.
 
-const PUSH_HIDE_KEY = 'ascunde-notificari'
+// Cheie nouă de la 2.2: după mutarea pe adresa nouă, îndemnul reapare o dată pentru cine n-a pornit notificările aici.
+const PUSH_HIDE_KEY = 'ascunde-notificari-2'
 export function PushPrompt({ user }) {
   const toast = useToast()
   const [status, setStatus] = useState(() => api.pushStatus())

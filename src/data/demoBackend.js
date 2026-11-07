@@ -331,6 +331,7 @@ export function saveAnnounced(uid, listId, state) {
 export const pushStatus = () => 'unsupported'
 export async function enablePush() { throw new Error(t('pushDemo')) }
 export async function disablePush() {}
+export async function refreshPush() {}
 export async function announce() {
   return { phones: 0, withoutPhone: [], demo: true }
 }

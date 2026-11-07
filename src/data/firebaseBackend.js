@@ -416,19 +416,41 @@ async function messaging() {
   return { m, messaging: m.getMessaging(app) }
 }
 
-export async function enablePush(user) {
-  const perm = await Notification.requestPermission()
-  if (perm !== 'granted') throw new Error(t('pushNotAllowed'))
+async function currentToken() {
   const { m, messaging: msg } = await messaging()
   const reg = await navigator.serviceWorker.ready
   const opts = { serviceWorkerRegistration: reg }
   if (import.meta.env.VITE_FIREBASE_VAPID_KEY) opts.vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
-  const token = await m.getToken(msg, opts)
-  if (!token) throw new Error(t('pushNoToken'))
+  return m.getToken(msg, opts)
+}
+
+// Codul telefonului se salvează cu adresa de pe care a fost pornit (`origin`): funcția `announce` îl
+// preferă pe cel de pe adresa de acum față de cele rămase de pe adresa veche.
+async function saveToken(user, token) {
+  const old = storedToken()
+  if (old && old !== token) await deleteDoc(doc(db, 'pushTokens', old)).catch(() => {})
   await setDoc(doc(db, 'pushTokens', token), {
-    uid: user.uid, email: user.email, at: serverTimestamp(), ua: navigator.userAgent.slice(0, 200),
+    uid: user.uid, email: user.email, at: serverTimestamp(), ua: navigator.userAgent.slice(0, 200), origin: window.location.host,
   })
   localStorage.setItem(TOKEN_KEY, token)
+}
+
+export async function enablePush(user) {
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') throw new Error(t('pushNotAllowed'))
+  const token = await currentToken()
+  if (!token) throw new Error(t('pushNoToken'))
+  await saveToken(user, token)
+}
+
+// La fiecare pornire: dacă telefonul are notificările pornite, reverificăm codul. Telefonul (mai ales
+// iPhone-ul) îl poate schimba sau pierde; așa ajunge mereu cel bun în cont.
+export async function refreshPush(user) {
+  if (pushStatus() !== 'on') return
+  try {
+    const token = await currentToken()
+    if (token) await saveToken(user, token)
+  } catch (e) { console.error(e) }
 }
 
 export async function disablePush() {

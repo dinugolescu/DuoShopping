@@ -15,5 +15,5 @@ export const {
   watchAllLists, watchAllowed, revokeAccess,
   loadUserPrefs, saveUserPrefs,
   watchAnnounced, saveAnnounced,
-  pushStatus, enablePush, disablePush, announce,
+  pushStatus, enablePush, disablePush, refreshPush, announce,
 } = backend

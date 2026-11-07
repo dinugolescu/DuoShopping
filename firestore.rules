@@ -63,7 +63,7 @@ service cloud.firestore {
     // Le citește doar funcția `announce` (din cloud); aplicația doar își scrie și își șterge propriul cod.
     match /pushTokens/{token} {
       allow create, update: if isAllowed()
-        && request.resource.data.keys().hasOnly(['uid', 'email', 'at', 'ua'])
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'at', 'ua', 'origin'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == myEmail();
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;

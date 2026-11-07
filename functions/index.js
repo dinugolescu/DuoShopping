@@ -13,6 +13,7 @@ setGlobalOptions({ region: 'europe-central2', maxInstances: 2 })
 const db = getFirestore()
 
 const MIN_GAP_MS = 20_000 // un anunț la cel mult 20 de secunde de la același om
+const OLD_HOST = 'duoshopping-9d75f.web.app'
 const DEAD_TOKEN = new Set([
   'messaging/registration-token-not-registered',
   'messaging/invalid-registration-token',
@@ -44,8 +45,16 @@ export const announce = onCall(async (req) => {
   if (!others.length) return { phones: 0, withoutPhone: [] }
 
   const tokSnap = await db.collection('pushTokens').where('email', 'in', others.slice(0, 30)).get()
-  const tokens = tokSnap.docs.map((d) => d.id)
-  const withPhone = new Set(tokSnap.docs.map((d) => d.get('email')))
+  // Aplicația s-a mutat de pe duoshopping-9d75f.web.app. Codurile salvate de acolo (sau dinainte să ținem
+  // adresa) deschid browserul pe adresa veche. Cine are deja un cod de pe adresa nouă primește doar acolo,
+  // iar codurile vechi i se șterg; cine n-are încă, primește în continuare pe cel vechi.
+  const isOld = (d) => !d.get('origin') || d.get('origin') === OLD_HOST
+  const freshEmails = new Set(tokSnap.docs.filter((d) => !isOld(d)).map((d) => d.get('email')))
+  const stale = tokSnap.docs.filter((d) => isOld(d) && freshEmails.has(d.get('email')))
+  await Promise.all(stale.map((d) => d.ref.delete()))
+  const used = tokSnap.docs.filter((d) => !stale.includes(d))
+  const tokens = used.map((d) => d.id)
+  const withPhone = new Set(used.map((d) => d.get('email')))
   const withoutPhone = others.filter((e) => !withPhone.has(e))
   if (!tokens.length) return { phones: 0, withoutPhone }
 

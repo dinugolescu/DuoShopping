@@ -123,6 +123,7 @@ function Home({ user, admin }) {
   const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
 
   useEffect(() => startPrefsSync(user.uid, api), [user.uid])
+  useEffect(() => { api.refreshPush(user) }, [user.uid])
   // Nu mai facem automat o listă la prima intrare: cine e invitat de familie ar fi ajuns cu două
   // liste „Cumpărături”. Cine n-are nicio listă vede ecranul gol, cu „Începe lista”.
   useEffect(() => api.watchLists(user, setLists, (e) => toast(errText(e))), [user.uid, user.email, toast])

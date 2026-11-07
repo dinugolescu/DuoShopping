@@ -285,8 +285,7 @@ export function AdminSheet({ user, onClose }) {
   async function del(l) {
     if (!window.confirm(t('adminDeleteConfirm', l.name, products(l.itemCount)))) return
     try {
-      if (l.memberEmails.includes(user.email)) await api.deleteList(l.id)
-      else await api.adminDeleteList(l.id)
+      await api.deleteList(l.id)
       toast(t('listDeleted', l.name))
     } catch (e) { toast(errText(e)) }
   }

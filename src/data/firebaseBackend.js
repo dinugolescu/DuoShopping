@@ -136,15 +136,6 @@ const secretCol = (listId) => collection(db, 'lists', listId, 'secret')
 const secretDoc = (listId, id) => doc(db, 'lists', listId, 'secret', id)
 const productsCol = (listId) => collection(db, 'lists', listId, 'products')
 
-// Batch-urile Firestore au maxim 500 de operații; le împărțim la nevoie.
-async function deleteRefs(refs) {
-  for (let i = 0; i < refs.length; i += 450) {
-    const b = writeBatch(db)
-    refs.slice(i, i + 450).forEach((r) => b.delete(r))
-    await b.commit()
-  }
-}
-
 // ---------- Liste ----------
 
 export function watchLists(user, cb, onError) {
@@ -177,28 +168,14 @@ export function setListAisles(listId, aisles) {
   fire(updateDoc(listDoc(listId), { aisles }))
 }
 
+// Ștergerea unei liste o face serverul (funcția `adminDeleteList`): pe o listă de cadouri, cine primește
+// cadouri nu poate citi tot conținutul, iar adminul nu vede conținutul listelor altora, deci din telefon
+// ștergerea ar fi refuzată. Serverul verifică să fie creatorul listei sau adminul.
 export async function deleteList(listId) {
-  const items = await getDocs(itemsCol(listId))
-  const refs = []
-  for (const it of items.docs) {
-    const msgs = await getDocs(msgsCol(listId, it.id))
-    refs.push(...msgs.docs.map((m) => m.ref), it.ref)
-  }
-  const secret = await getDocs(secretCol(listId)).catch(() => ({ docs: [] }))
-  for (const s of secret.docs) {
-    const msgs = await getDocs(msgsCol(listId, s.id, 'secret'))
-    refs.push(...msgs.docs.map((m) => m.ref), s.ref)
-  }
-  const products = await getDocs(productsCol(listId))
-  refs.push(...products.docs.map((p) => p.ref), listDoc(listId))
-  fire(deleteRefs(refs))
-}
-
-// Adminul șterge o listă în care nu e membru: conținutul nu-l poate citi, deci îl șterge serverul.
-export async function adminDeleteList(listId) {
   const { getFunctions, httpsCallable } = await import('firebase/functions')
   await httpsCallable(getFunctions(app, 'europe-central2'), 'adminDeleteList')({ listId })
 }
+export const adminDeleteList = deleteList
 
 // Invitația pune adresa în listă și îi dă acces în aplicație.
 // `receives`: pe o listă de cadouri, persoana primește cadouri (își vede doar dorințele ei).

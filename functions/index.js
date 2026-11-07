@@ -75,18 +75,23 @@ export const announce = onCall(async (req) => {
   return { phones: res.successCount, withoutPhone }
 })
 
-// Adminul poate șterge orice listă, dar nu are voie să-i citească conținutul (vezi firestore.rules).
-// Ștergerea completă (produse, mesaje, poze, catalog) o face deci serverul.
+// Ștergerea completă a unei liste (produse, mesaje, poze, partea ascunsă a listei de cadouri, catalog).
+// O face serverul, pentru că nici adminul, nici cine primește cadouri nu are voie să citească tot conținutul
+// (vezi firestore.rules). Au voie creatorul listei și adminul. Numele a rămas din prima variantă (doar admin).
 export const adminDeleteList = onCall(async (req) => {
   const token = req.auth?.token
   const email = token?.email?.toLowerCase()
   if (!email || token.email_verified !== true) throw new HttpsError('unauthenticated', 'Intră în cont.')
-  if (!(await db.doc(`admins/${email}`).get()).exists) throw new HttpsError('permission-denied', 'Doar adminul poate șterge listele altora.')
 
   const { listId } = req.data || {}
   if (typeof listId !== 'string' || !listId || listId.includes('/')) throw new HttpsError('invalid-argument', 'Lista lipsește.')
   const ref = db.doc(`lists/${listId}`)
-  if (!(await ref.get()).exists) throw new HttpsError('not-found', 'Lista nu mai există.')
+  const snap = await ref.get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Lista nu mai există.')
+  const isOwner = snap.get('ownerUid') === req.auth.uid
+  if (!isOwner && !(await db.doc(`admins/${email}`).get()).exists) {
+    throw new HttpsError('permission-denied', 'Doar cine a creat lista sau adminul o poate șterge.')
+  }
   await db.recursiveDelete(ref)
   return { ok: true }
 })

@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore'
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
 import { productKey } from '../aisles.js'
+import { t } from '../i18n.jsx'
 
 // Pe iPhone, login-ul din aplicația instalată merge doar dacă pagina de login e pe același domeniu
 // cu aplicația (vezi SETUP.md, pasul 5). Aplicația e publicată pe mai multe adrese Firebase, deci
@@ -347,19 +348,19 @@ export function pushStatus() {
 
 async function messaging() {
   const m = await import('firebase/messaging')
-  if (!(await m.isSupported())) throw new Error('Telefonul sau browserul nu permite notificări.')
+  if (!(await m.isSupported())) throw new Error(t('pushUnsupported'))
   return { m, messaging: m.getMessaging(app) }
 }
 
 export async function enablePush(user) {
   const perm = await Notification.requestPermission()
-  if (perm !== 'granted') throw new Error('Notificările nu au fost permise.')
+  if (perm !== 'granted') throw new Error(t('pushNotAllowed'))
   const { m, messaging: msg } = await messaging()
   const reg = await navigator.serviceWorker.ready
   const opts = { serviceWorkerRegistration: reg }
   if (import.meta.env.VITE_FIREBASE_VAPID_KEY) opts.vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
   const token = await m.getToken(msg, opts)
-  if (!token) throw new Error('Nu am primit un cod de notificare de la Google.')
+  if (!token) throw new Error(t('pushNoToken'))
   await setDoc(doc(db, 'pushTokens', token), {
     uid: user.uid, email: user.email, at: serverTimestamp(), ua: navigator.userAgent.slice(0, 200),
   })

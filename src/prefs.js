@@ -3,21 +3,18 @@
 import { useEffect, useState } from 'react'
 import { DEFAULT_ICON, iconDataUrl, iconKey } from './appIcons.js'
 
-export const THEMES = [
-  { id: 'auto', label: 'Automat' },
-  { id: 'light', label: 'Luminos' },
-  { id: 'dark', label: 'Întunecat' },
-]
+// Numele afișate vin din traduceri (t('theme.auto') etc.).
+export const THEMES = [{ id: 'auto' }, { id: 'light' }, { id: 'dark' }]
 
-// `google` = numele familiei pe Google Fonts; null = fontul telefonului.
+// `google` = numele familiei pe Google Fonts; null = fontul telefonului. Numele afișat: t('font.<id>').
 export const FONTS = [
-  { id: 'system', label: 'Fontul telefonului', css: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', google: null },
-  { id: 'nunito', label: 'Nunito (rotunjit)', css: '"Nunito", sans-serif', google: 'Nunito:wght@400;600;700' },
-  { id: 'lexend', label: 'Lexend (foarte lizibil)', css: '"Lexend", sans-serif', google: 'Lexend:wght@400;500;700' },
-  { id: 'hand', label: 'Patrick Hand (scris de mână)', css: '"Patrick Hand", cursive', google: 'Patrick+Hand' },
+  { id: 'system', css: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', google: null },
+  { id: 'nunito', css: '"Nunito", sans-serif', google: 'Nunito:wght@400;600;700' },
+  { id: 'lexend', css: '"Lexend", sans-serif', google: 'Lexend:wght@400;500;700' },
+  { id: 'hand', css: '"Patrick Hand", cursive', google: 'Patrick+Hand' },
 ]
 
-const DEFAULTS = { theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [], personalLists: [] }
+const DEFAULTS = { lang: 'ro', theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [], personalLists: [] }
 const KEY = 'cumparaturi-prefs'
 
 function load() {
@@ -40,6 +37,8 @@ function commit(next, fromAccount = false) {
   subs.forEach((f) => f(current))
   if (!fromAccount) changeSubs.forEach((f) => f(current))
 }
+
+export const getPref = (key) => current[key]
 
 export function setPref(key, value) {
   commit({ ...current, [key]: value })
@@ -82,6 +81,7 @@ export function usePrefs() {
 
 function apply(p) {
   const root = document.documentElement
+  root.lang = p.lang || 'ro'
   if (p.theme === 'auto') delete root.dataset.theme
   else root.dataset.theme = p.theme
 

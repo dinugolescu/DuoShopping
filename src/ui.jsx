@@ -1,6 +1,7 @@
 // Piese de interfață folosite peste tot: mesaje scurte (toast), ferestre de jos (sheet), utilitare.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { IconX } from './icons.jsx'
+import { t, lang } from './i18n.jsx'
 
 export const store = {
   get(k, fallback = null) {
@@ -14,20 +15,23 @@ export const firstName = (name) => String(name || '').split(' ')[0]
 export function errText(e) {
   const code = e?.code || ''
   if (['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(code)) return null
-  if (code === 'auth/unauthorized-domain') return 'Domeniul nu e autorizat în Firebase (vezi SETUP.md).'
-  if (code === 'permission-denied' || code === 'firestore/permission-denied') return 'Nu ai voie să faci asta.'
-  if (code === 'auth/network-request-failed') return 'Nu e conexiune la internet.'
-  if (code.startsWith('functions/') && e?.message && code !== 'functions/internal') return e.message
-  if (e?.name === 'QuotaExceededError') return 'Nu mai e loc în browser (mod demo). Șterge câteva poze.'
-  return 'Ceva n-a mers: ' + (e?.message || e)
+  if (code === 'auth/unauthorized-domain') return t('errUnauthorizedDomain')
+  if (code === 'permission-denied' || code === 'firestore/permission-denied') return t('errDenied')
+  if (code === 'auth/network-request-failed') return t('errNetwork')
+  // Serverul răspunde în română; în altă limbă traducem după cod.
+  if (code.startsWith('functions/') && e?.message && code !== 'functions/internal') {
+    return (lang() !== 'ro' && t('errFunction', code)) || e.message
+  }
+  if (e?.name === 'QuotaExceededError') return t('errQuota')
+  return t('errGeneric', e?.message || e)
 }
 
 // Eroare la trimiterea unui anunț: spunem limpede că n-a plecat.
 export function announceErrText(e) {
   const code = e?.code || ''
   const offline = !navigator.onLine || ['functions/unavailable', 'functions/internal', 'functions/deadline-exceeded'].includes(code)
-  if (offline) return 'Anunțul n-a plecat: nu e conexiune la internet. Încearcă din nou când ai semnal.'
-  return `Anunțul n-a plecat. ${errText(e) || ''}`.trim()
+  if (offline) return t('announceOffline')
+  return `${t('announceFailed')} ${errText(e) || ''}`.trim()
 }
 
 // Re-randează periodic, ca „azi la…” să devină „ieri la…” fără reîncărcare.
@@ -60,7 +64,7 @@ export function ToastHost({ children }) {
       {toast && (
         <div className="toast" role="status" key={toast.key}>
           <span>{toast.text}</span>
-          {toast.undo && <button onClick={() => { toast.undo(); setToast(null) }}>Anulează</button>}
+          {toast.undo && <button onClick={() => { toast.undo(); setToast(null) }}>{t('undo')}</button>}
         </div>
       )}
     </ToastCtx.Provider>
@@ -120,7 +124,8 @@ export function Sheet({ title, onClose, children, className = '' }) {
       <div className={`sheet ${className}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Închide"><IconX /></button>
+          <button className="icon-btn" onClick={onClose} aria-label={t('close')}><IconX /></button>
+
         </div>
         {children}
       </div>

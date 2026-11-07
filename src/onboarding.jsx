@@ -6,6 +6,7 @@ import { Sheet, store, useToast, firstName, errText, useBackClose } from './ui.j
 import { usePrefs, setPref } from './prefs.js'
 import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 import { speechSupported } from './voice.js'
+import { t, lang, LANGS } from './i18n.jsx'
 
 // Adresa pe care o trimitem în invitații (VITE_APP_URL, altfel adresa curentă).
 export const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin
@@ -60,27 +61,17 @@ function useInstallPrompt() {
 // Merge și pentru cine are deja aplicația (nu putem ști dinainte), și pentru cine o instalează acum.
 export function inviteText({ fromName, email, listName }) {
   const who = firstName(fromName)
-  const head = listName
-    ? [`${who} te-a adăugat în lista „${listName}” din DuoShopping.`, '', 'Dacă ai deja aplicația, deschide-o: lista apare acolo.', 'Dacă nu o ai încă:']
-    : [`${who} te-a invitat în DuoShopping, lista de cumpărături comună a familiei.`, '', 'Dacă ai deja aplicația, ai acum acces și îți poți face liste noi. Dacă nu o ai încă:']
-  return [
-    ...head,
-    `1. Deschide linkul: ${APP_URL}`,
-    '   Pe iPhone deschide-l în Safari, pe Android în Chrome (nu în browserul din WhatsApp sau Facebook).',
-    '2. Alege iconița și pune aplicația pe ecranul principal, cum îți arată pagina.',
-    `3. Deschide DuoShopping de pe ecran, apasă „Intră cu Google” și alege contul ${email}.`,
-    '',
-    `Invitația e doar pentru adresa ${email}. Ca să intre și altcineva din familie, îl inviți din aplicație, pe adresa lui.`,
-  ].join('\n')
+  const head = listName ? t('inviteListHead', who, listName) : t('inviteAppHead', who)
+  return [...head, ...t('inviteSteps', APP_URL, email)].join('\n')
 }
 
 export async function shareText(text, toast) {
   try {
     if (navigator.share) { await navigator.share({ text }); return }
     await navigator.clipboard.writeText(text)
-    toast('Invitația e copiată. Lipește-o în WhatsApp sau într-un mesaj.')
+    toast(t('inviteCopied'))
   } catch (e) {
-    if (e?.name !== 'AbortError') toast('Nu am putut deschide trimiterea. Încearcă din nou.')
+    if (e?.name !== 'AbortError') toast(t('shareFailed'))
   }
 }
 
@@ -94,23 +85,20 @@ export function InviteAppSheet({ user, onClose }) {
   function submit(e) {
     e.preventDefault()
     const v = email.trim().toLowerCase()
-    if (!EMAIL_RE.test(v)) { toast('Adresa de email nu pare validă'); return }
-    if (v === user.email) { toast('Asta e adresa ta'); return }
+    if (!EMAIL_RE.test(v)) { toast(t('invalidEmail')); return }
+    if (v === user.email) { toast(t('ownEmail')); return }
     api.inviteToApp(user, v)
     setInvited(v)
     setEmail('')
   }
 
   return (
-    <Sheet title="Invită o familie nouă" onClose={onClose}>
-      <p className="muted small">
-        Persoana primește acces în aplicație și își face propria listă, pe care o împarte cu cine vrea ea.
-        Nu vede listele tale. Dacă vrei să vadă o listă de-a ta, invit-o din butonul cu oameni de sus.
-      </p>
+    <Sheet title={t('inviteFamily')} onClose={onClose}>
+      <p className="muted small">{t('inviteFamilyHint')}</p>
       <form className="row" onSubmit={submit}>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="adresa@gmail.com"
-          autoComplete="off" autoCapitalize="off" aria-label="Email de invitat" />
-        <button className="btn primary" disabled={!email.trim()}>Invită</button>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('emailPh')}
+          autoComplete="off" autoCapitalize="off" aria-label={t('inviteEmailLabel')} />
+        <button className="btn primary" disabled={!email.trim()}>{t('invite')}</button>
       </form>
       {invited && <InviteShare user={user} email={invited} />}
     </Sheet>
@@ -123,10 +111,10 @@ export function InviteShare({ user, email, listName }) {
   const text = inviteText({ fromName: user.name, email, listName })
   return (
     <div className="invite-done">
-      <p><b>{email}</b> are acces acum. Aplicația nu trimite emailuri, așa că trimite-i tu invitația:</p>
+      <p>{t('inviteDone', email)}</p>
       <div className="announce-preview small">{text}</div>
       <button className="btn primary wide" onClick={() => shareText(text, toast)}>
-        Trimite invitația (WhatsApp, SMS…)
+        {t('sendInvite')}
       </button>
     </div>
   )
@@ -136,15 +124,13 @@ export function InviteShare({ user, email, listName }) {
 
 export function InstallSheet({ onClose }) {
   return (
-    <Sheet title="Pune aplicația pe ecran" onClose={onClose}>
-      <p className="muted small">
-        Instalată, DuoShopping se deschide pe tot ecranul, ca o aplicație obișnuită, și poate primi notificări.
-      </p>
+    <Sheet title={t('installApp')} onClose={onClose}>
+      <p className="muted small">{t('installIntro')}</p>
       {!isInstalled() && !device.wrongBrowser && device.mobile && (
         <>
-          <h3>Alege întâi iconița</h3>
+          <h3>{t('pickIconFirst')}</h3>
           <IconPicker />
-          <h3>Apoi</h3>
+          <h3>{t('then')}</h3>
         </>
       )}
       <InstallSteps onInstalled={onClose} />
@@ -160,35 +146,35 @@ function InstallSteps({ onInstalled }) {
   async function install() {
     prompt.prompt()
     const { outcome } = await prompt.userChoice
-    if (outcome === 'accepted') { toast('Gata, o găsești pe ecranul principal'); onInstalled?.() }
+    if (outcome === 'accepted') { toast(t('installedToast')); onInstalled?.() }
   }
 
-  if (isInstalled()) return <p>Aplicația e deja instalată pe acest telefon.</p>
+  if (isInstalled()) return <p>{t('alreadyInstalled')}</p>
   if (device.inApp) return <InAppSteps />
   if (device.androidOtherBrowser) return <OtherBrowserSteps />
   if (device.ios) {
     return (
       <ol className="steps">
-        {device.iosOtherBrowser && <li>Cel mai sigur merge din <b>Safari</b>: copiază linkul și deschide-l acolo.</li>}
-        <li>Apasă butonul <b>Partajează</b> (pătratul cu săgeata în sus{device.iosOtherBrowser ? ', din bara de adresă' : ', jos în mijloc'}).</li>
-        <li>Derulează și alege <b>„Adaugă pe ecranul principal”</b>.</li>
-        <li>Apasă <b>„Adaugă”</b>, apoi deschide DuoShopping de pe ecran, nu din browser.</li>
-        <li>Acolo intri cu Google și pornești notificările: aplicația de pe ecran nu le preia din Safari.</li>
+        {device.iosOtherBrowser && <li>{t('iosSafariFirst')}</li>}
+        <li>{t('iosShare', device.iosOtherBrowser)}</li>
+        <li>{t('iosAddHome')}</li>
+        <li>{t('iosAdd')}</li>
+        <li>{t('iosThenLogin')}</li>
       </ol>
     )
   }
-  if (prompt) return <button className="btn primary wide" onClick={install}>Instalează DuoShopping</button>
+  if (prompt) return <button className="btn primary wide" onClick={install}>{t('installButton')}</button>
   if (device.android) {
     return (
       <ol className="steps">
-        <li>Deschide linkul în <b>Chrome</b>.</li>
-        <li>Apasă meniul <b>⋮</b> din dreapta sus.</li>
-        <li>Alege <b>„Instalează aplicația”</b> sau <b>„Adaugă pe ecranul principal”</b>, apoi <b>„Instalează”</b>.</li>
-        <li>Deschide DuoShopping de pe ecran.</li>
+        <li>{t('androidChrome')}</li>
+        <li>{t('androidMenu')}</li>
+        <li>{t('androidInstall')}</li>
+        <li>{t('openFromHome')}</li>
       </ol>
     )
   }
-  return <p>Pe calculator, folosește iconița de instalare din bara de adresă a browserului (Chrome sau Edge).</p>
+  return <p>{t('desktopInstall')}</p>
 }
 
 // ---------- Ecranul de bun venit ----------
@@ -203,30 +189,31 @@ export function Welcome({ logo, onContinue }) {
     <main className="welcome">
       {logo}
       <h1>DuoShopping</h1>
-      <p className="muted">Lista de cumpărături comună a familiei, pe toate telefoanele.</p>
+      <p className="muted">{t('welcomeTagline')}</p>
+      <LangPicker compact />
       <ul className="features">
-        <li><span aria-hidden="true">🔄</span> Ce adaugă unul apare pe loc pe telefoanele celorlalți.</li>
-        <li><span aria-hidden="true">🔔</span> Cu un buton anunți că ai terminat lista sau că ai ajuns la magazin.</li>
-        <li><span aria-hidden="true">🛒</span> Produsele se așază singure pe raioane, în ordinea magazinului tău.</li>
-        <li><span aria-hidden="true">💬</span> Discuții și poze la fiecare produs: „care marcă?”, „asta?”.</li>
+        <li><span aria-hidden="true">🔄</span> {t('featSync')}</li>
+        <li><span aria-hidden="true">🔔</span> {t('featAnnounce')}</li>
+        <li><span aria-hidden="true">🛒</span> {t('featAisles')}</li>
+        <li><span aria-hidden="true">💬</span> {t('featChat')}</li>
       </ul>
       {device.wrongBrowser ? (
         <div className="warn-box">
-          <b>Deschide linkul în {device.ios ? 'Safari' : 'Chrome'}</b>
+          <b>{t('openIn', device.ios ? 'Safari' : 'Chrome')}</b>
           {device.inApp ? <InAppSteps /> : <OtherBrowserSteps />}
         </div>
       ) : (
         <div className="welcome-steps">
-          <h3>1. Alege iconița</h3>
+          <h3>{t('step1Icon')}</h3>
           <IconPicker />
-          <h3>2. Pune aplicația pe ecran</h3>
+          <h3>{t('step2Install')}</h3>
           <InstallSteps />
-          <h3>3. Intră din aplicație</h3>
-          <p className="small">Deschide DuoShopping de pe ecran și intră cu Google. Te loghezi o singură dată, direct acolo.</p>
+          <h3>{t('step3Login')}</h3>
+          <p className="small">{t('step3Text')}</p>
         </div>
       )}
       <button className="link-btn" onClick={() => { store.set(BROWSER_KEY, true); onContinue() }}>
-        Continuă în browser, fără instalare
+        {t('continueBrowser')}
       </button>
     </main>
   )
@@ -235,7 +222,7 @@ export function Welcome({ logo, onContinue }) {
 function useCopyLink() {
   const toast = useToast()
   return async () => {
-    try { await navigator.clipboard.writeText(APP_URL); toast('Link copiat') } catch { toast(APP_URL) }
+    try { await navigator.clipboard.writeText(APP_URL); toast(t('linkCopied')) } catch { toast(APP_URL) }
   }
 }
 
@@ -251,12 +238,12 @@ function OtherBrowserSteps() {
   return (
     <>
       <ol className="steps">
-        <li>Ești în alt browser decât Chrome. Instalată de aici, aplicația poate fi blocată de telefon ca „nesigură”.</li>
-        <li>Apasă <b>„Deschide în Chrome”</b> și continuă de acolo.</li>
-        <li>Dacă nu merge, copiază linkul și lipește-l în Chrome.</li>
+        <li>{t('otherBrowser1')}</li>
+        <li>{t('otherBrowser2')}</li>
+        <li>{t('otherBrowser3')}</li>
       </ol>
-      <a className="btn primary wide" href={chromeIntentUrl()}>Deschide în Chrome</a>
-      <button className="btn wide" onClick={copy}>Copiază linkul</button>
+      <a className="btn primary wide" href={chromeIntentUrl()}>{t('openInChrome')}</a>
+      <button className="btn wide" onClick={copy}>{t('copyLink')}</button>
     </>
   )
 }
@@ -266,11 +253,11 @@ function InAppSteps() {
   return (
     <>
       <ol className="steps">
-        <li>Ești în browserul din altă aplicație (WhatsApp, Facebook…). De aici Google nu permite logarea{device.ios ? ' și nu se poate instala aplicația' : ''}.</li>
-        <li>Apasă meniul <b>⋯</b> sau <b>⋮</b> din colț și alege <b>„Deschide în {device.ios ? 'Safari' : 'Chrome'}”</b> (sau „Deschide în browser”).</li>
-        <li>Dacă nu găsești opțiunea, copiază linkul și lipește-l în {device.ios ? 'Safari' : 'Chrome'}.</li>
+        <li>{t('inApp1', device.ios)}</li>
+        <li>{t('inApp2', device.ios ? 'Safari' : 'Chrome')}</li>
+        <li>{t('inApp3', device.ios ? 'Safari' : 'Chrome')}</li>
       </ol>
-      <button className="btn wide" onClick={copy}>Copiază linkul</button>
+      <button className="btn wide" onClick={copy}>{t('copyLink')}</button>
     </>
   )
 }
@@ -280,7 +267,7 @@ export function InAppWarning() {
   if (!device.inApp) return null
   return (
     <div className="warn-box">
-      <b>Deschide linkul în {device.ios ? 'Safari' : 'Chrome'}</b>
+      <b>{t('openIn', device.ios ? 'Safari' : 'Chrome')}</b>
       <InAppSteps />
     </div>
   )
@@ -293,8 +280,8 @@ export function InstallBanner({ onOpen }) {
   if (hidden || isInstalled() || !device.mobile) return null
   return (
     <div className="hint-bar">
-      <button className="grow hint-main" onClick={onOpen}>📲 Pune DuoShopping pe ecran{device.ios ? ', ca să primești notificări' : ''}</button>
-      <button className="btn small" onClick={() => { store.set(INSTALL_HIDE_KEY, true); setHidden(true) }}>Nu acum</button>
+      <button className="grow hint-main" onClick={onOpen}>{t('installBanner', device.ios)}</button>
+      <button className="btn small" onClick={() => { store.set(INSTALL_HIDE_KEY, true); setHidden(true) }}>{t('notNow')}</button>
     </div>
   )
 }
@@ -310,15 +297,15 @@ export function Tips({ onDone }) {
   useBackClose(done)
   return (
     <div className="modal-backdrop">
-      <section className="modal" role="dialog" aria-modal="true" aria-label="Pe scurt, cum merge">
-        <h2>Pe scurt, cum merge</h2>
+      <section className="modal" role="dialog" aria-modal="true" aria-label={t('tipsTitle')}>
+        <h2>{t('tipsTitle')}</h2>
         <ul className="features">
-          <li><span aria-hidden="true">✍️</span> Scrie ce lipsește{speechSupported() ? ' sau apasă 🎤 și spune' : ''}. Mai multe deodată, cu virgulă: „lapte, ouă, două pâini”. Produsele se așază singure pe raioane.</li>
-          <li><span aria-hidden="true">🔔</span> Când termini de completat, apasă clopoțelul ca să-i anunți pe ceilalți.</li>
-          <li><span aria-hidden="true">🛒</span> În magazin pornește „Mod magazin”: ecranul rămâne aprins cât bifezi.</li>
-          <li><span aria-hidden="true">☰</span> Din meniu pui raioanele în ordinea magazinului tău și vezi istoricul.</li>
+          <li><span aria-hidden="true">✍️</span> {t('tipWrite', speechSupported())}</li>
+          <li><span aria-hidden="true">🔔</span> {t('tipBell')}</li>
+          <li><span aria-hidden="true">🛒</span> {t('tipShop')}</li>
+          <li><span aria-hidden="true">☰</span> {t('tipMenu')}</li>
         </ul>
-        <button className="btn primary wide big" onClick={done}>Am înțeles</button>
+        <button className="btn primary wide big" onClick={done}>{t('gotIt')}</button>
       </section>
     </div>
   )
@@ -331,37 +318,29 @@ export function IconPicker() {
   const prefs = usePrefs()
   if (device.ios && isInstalled()) {
     return (
-      <p className="muted small">
-        Pe iPhone, iconița de pe ecran rămâne cea aleasă la adăugare. Ca s-o schimbi: șterge iconița de pe ecran,
-        deschide {APP_URL} în Safari, alege iconița din ☰ → Setări și aspect, apoi adaug-o din nou pe ecran.
-        După readăugare intri din nou cu Google și pornești din nou notificările.
-      </p>
+      <p className="muted small">{t('iconIosFixed', APP_URL)}</p>
     )
   }
   return (
     <>
-      <div className="icon-grid" role="radiogroup" aria-label="Desenul iconiței">
+      <div className="icon-grid" role="radiogroup" aria-label={t('iconDesign')}>
         {ICON_DESIGNS.map((d) => (
           <button key={d.id} role="radio" aria-checked={prefs.icon === d.id}
             className={`icon-pick ${prefs.icon === d.id ? 'active' : ''}`} onClick={() => setPref('icon', d.id)}>
             <img src={iconDataUrl(d.id, prefs.iconColor)} alt="" />
-            <span>{d.label}</span>
+            <span>{t(`icon.${d.id}`)}</span>
           </button>
         ))}
       </div>
-      <div className="swatches" role="radiogroup" aria-label="Culoarea iconiței">
+      <div className="swatches" role="radiogroup" aria-label={t('iconColor')}>
         {ICON_COLORS.map((c) => (
-          <button key={c.id} role="radio" aria-checked={prefs.iconColor === c.id} aria-label={c.label} title={c.label}
+          <button key={c.id} role="radio" aria-checked={prefs.iconColor === c.id} aria-label={t(`color.${c.id}`)} title={t(`color.${c.id}`)}
             className={`swatch ${prefs.iconColor === c.id ? 'active' : ''}`} style={{ background: c.bg }}
             onClick={() => setPref('iconColor', c.id)} />
         ))}
       </div>
       <p className="muted small">
-        {device.ios
-          ? 'Pe iPhone, iconița se fixează când adaugi aplicația pe ecran, așa că alege-o înainte.'
-          : isInstalled()
-            ? 'Pe Android, iconița de pe ecran se poate actualiza singură în cel mult o zi; dacă nu, dezinstalează și instalează din nou.'
-            : 'Iconița aleasă aici apare pe ecran când instalezi aplicația.'}
+        {device.ios ? t('iconHintIos') : isInstalled() ? t('iconHintAndroid') : t('iconHintInstall')}
       </p>
     </>
   )
@@ -380,21 +359,37 @@ export function PushPrompt({ user }) {
 
   async function enable() {
     setBusy(true)
-    try { await api.enablePush(user); toast('Notificările sunt pornite pe acest telefon') } catch (e) { toast(errText(e)) }
+    try { await api.enablePush(user); toast(t('pushOn')) } catch (e) { toast(errText(e)) }
     setStatus(api.pushStatus())
     setBusy(false)
   }
 
   return (
     <section className="tips push-prompt">
-      <h3>🔔 Pornește notificările</h3>
-      <p className="small">
-        Așa afli când celălalt a terminat de completat lista sau a ajuns la magazin. Fără ele, DuoShopping e doar o listă.
-      </p>
+      <h3>{t('pushPromptTitle')}</h3>
+      <p className="small">{t('pushPromptText')}</p>
       <div className="row">
-        <button className="btn primary small" disabled={busy} onClick={enable}>Pornește</button>
-        <button className="btn small" onClick={() => { store.set(PUSH_HIDE_KEY, true); setHidden(true) }}>Nu acum</button>
+        <button className="btn primary small" disabled={busy} onClick={enable}>{t('turnOn')}</button>
+        <button className="btn small" onClick={() => { store.set(PUSH_HIDE_KEY, true); setHidden(true) }}>{t('notNow')}</button>
       </div>
     </section>
   )
 }
+
+// ---------- Alegerea limbii ----------
+// În Setări, și discret pe ecranele de dinainte de login (bun venit, intrare), ca un vorbitor de engleză
+// să nu treacă prin tot onboarding-ul în română. Se salvează ca orice altă preferință (și în cont).
+
+export function LangPicker({ compact = false }) {
+  usePrefs()
+  const current = lang()
+  return (
+    <div className={`segmented ${compact ? 'lang-compact' : ''}`} role="radiogroup" aria-label={t('language')}>
+      {LANGS.map((l) => (
+        <button key={l.id} role="radio" aria-checked={current === l.id} lang={l.id}
+          className={current === l.id ? 'on' : ''} onClick={() => setPref('lang', l.id)}>{l.label}</button>
+      ))}
+    </div>
+  )
+}
+

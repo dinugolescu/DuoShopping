@@ -6,6 +6,7 @@ import { compressImage } from './image.js'
 import { relTime } from './time.js'
 import { Sheet, firstName, useNow, useToast, errText, useBackClose } from './ui.jsx'
 import { IconCamera, IconSend, IconX } from './icons.jsx'
+import { t } from './i18n.jsx'
 
 export function ChatSheet({ list, item, user, onClose }) {
   const toast = useToast()
@@ -45,20 +46,16 @@ export function ChatSheet({ list, item, user, onClose }) {
   }
 
   function remove(m) {
-    if (!window.confirm('Ștergi mesajul?')) return
+    if (!window.confirm(t('deleteMsgConfirm'))) return
     api.deleteMessage(list.id, item.id, m.id)
     setActiveId(null)
   }
 
   return (
-    <Sheet title={`Discuție: ${item.name}`} onClose={onClose} className="chat">
+    <Sheet title={t('chatTitle', item.name)} onClose={onClose} className="chat">
       <div className="chat-msgs">
-        {msgs === null && <p className="center muted">Se încarcă…</p>}
-        {msgs?.length === 0 && (
-          <p className="center muted pad small">
-            Nicio întrebare încă. Ex.: „De care cafea?” sau trimite o poză cu raftul: „Doar astea sunt, pe care o iei?”
-          </p>
-        )}
+        {msgs === null && <p className="center muted">{t('loading')}</p>}
+        {msgs?.length === 0 && <p className="center muted pad small">{t('chatEmpty')}</p>}
         {msgs?.map((m) => {
           const mine = m.by?.uid === user.uid
           const shown = REACTIONS.filter((r) => m.reactions?.[r.id]?.length)
@@ -66,12 +63,12 @@ export function ChatSheet({ list, item, user, onClose }) {
             <div key={m.id} className={`msg ${mine ? 'mine' : ''}`}>
               {!mine && <div className="msg-author">{firstName(m.by?.name)}</div>}
               <button className="bubble" onClick={() => setActiveId(activeId === m.id ? null : m.id)}
-                aria-label={`Mesaj de la ${firstName(m.by?.name)}. Apasă pentru reacții.`}>
+                aria-label={t('msgFrom', firstName(m.by?.name))}>
                 {m.photo && (
-                  <img src={m.photo} alt="Poză trimisă în discuție" className="msg-photo"
+                  <img src={m.photo} alt={t('chatPhotoAlt')} className="msg-photo"
                     onClick={(e) => { e.stopPropagation(); setZoom(m.photo) }} />
                 )}
-                {m.photoDeleted && <span className="msg-text muted small">📷 poză ștearsă la golirea listei</span>}
+                {m.photoDeleted && <span className="msg-text muted small">{t('photoDeleted')}</span>}
                 {m.text && <span className="msg-text">{m.text}</span>}
                 <span className="msg-time">{relTime(m.at, now)}</span>
               </button>
@@ -90,9 +87,9 @@ export function ChatSheet({ list, item, user, onClose }) {
               {activeId === m.id && (
                 <div className="react-bar">
                   {REACTIONS.map((r) => (
-                    <button key={r.id} onClick={() => react(m, r)} aria-label={`Reacție ${r.emoji}`}>{r.emoji}</button>
+                    <button key={r.id} onClick={() => react(m, r)} aria-label={t('reactionLabel', r.emoji)}>{r.emoji}</button>
                   ))}
-                  {mine && <button className="danger small" onClick={() => remove(m)}>Șterge</button>}
+                  {mine && <button className="danger small" onClick={() => remove(m)}>{t('delete')}</button>}
                 </div>
               )}
             </div>
@@ -103,18 +100,18 @@ export function ChatSheet({ list, item, user, onClose }) {
 
       {photo && (
         <div className="photo-preview">
-          <img src={photo} alt="Poza de trimis" />
-          <button className="icon-btn" onClick={() => setPhoto(null)} aria-label="Renunță la poză"><IconX /></button>
+          <img src={photo} alt={t('photoToSend')} />
+          <button className="icon-btn" onClick={() => setPhoto(null)} aria-label={t('dropPhoto')}><IconX /></button>
         </div>
       )}
       <form className="composer" onSubmit={send}>
-        <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} disabled={busy} aria-label="Atașează o poză">
+        <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} disabled={busy} aria-label={t('attachPhoto')}>
           <IconCamera />
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={choosePhoto} />
         <input className="grow" value={text} onChange={(e) => setText(e.target.value)}
-          placeholder={busy ? 'Se pregătește poza…' : 'Scrie un mesaj…'} maxLength={1000} enterKeyHint="send" aria-label="Mesaj" />
-        <button className="add-btn" disabled={busy || (!text.trim() && !photo)} aria-label="Trimite"><IconSend /></button>
+          placeholder={busy ? t('preparingPhoto') : t('writeMsg')} maxLength={1000} enterKeyHint="send" aria-label={t('message')} />
+        <button className="add-btn" disabled={busy || (!text.trim() && !photo)} aria-label={t('send')}><IconSend /></button>
       </form>
 
       {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
@@ -125,8 +122,9 @@ export function ChatSheet({ list, item, user, onClose }) {
 function Lightbox({ src, onClose }) {
   useBackClose(onClose)
   return (
-    <div className="lightbox" onClick={onClose} role="dialog" aria-label="Poză mărită">
-      <img src={src} alt="Poză mărită" />
+    <div className="lightbox" onClick={onClose} role="dialog" aria-label={t('zoomedPhoto')}>
+      <img src={src} alt={t('zoomedPhoto')} />
+
     </div>
   )
 }

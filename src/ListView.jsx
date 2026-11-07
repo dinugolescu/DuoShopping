@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './data/index.js'
 import { SKIP_REASONS, CUSTOM, reasonLabel } from './config.js'
-import { listAisles, aisleIn, guessAisle, normalize, productKey } from './aisles.js'
+import { listAisles, aisleIn, aisleLabel, guessAisle, normalize, productKey } from './aisles.js'
+
 import { relTime, fullDate } from './time.js'
 import { usePrefs } from './prefs.js'
 import { Sheet, firstName, store, useNow, useToast, errText } from './ui.jsx'
 import { ChatSheet } from './Chat.jsx'
 import { sendAnnounce, atShopText } from './sheets.jsx'
 import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic } from './icons.jsx'
-import { speechSupported, listen, speechErrText, parseProducts } from './voice.js'
+import { speechSupported, listen, speechErrText, parseProducts, hasSpokenAnd } from './voice.js'
+import { t } from './i18n.jsx'
 
 const SEEN_KEY = 'mesaje-vazute'
 const KEYBOARD_VOICE_KEY = 'voce-prin-tastatura'
@@ -32,7 +34,7 @@ export function ListView({ list, user }) {
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const aisles = listAisles(list)
 
-  if (!items) return <div className="center muted">Se încarcă…</div>
+  if (!items) return <div className="center muted">{t('loading')}</div>
 
   const pending = items.filter((i) => i.status === 'pending').sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
   const done = items.filter((i) => i.status !== 'pending').sort((a, b) => (b.resolvedAt ?? 0) - (a.resolvedAt ?? 0))
@@ -44,16 +46,16 @@ export function ListView({ list, user }) {
   function change(item, status, reason = null, reasonText = '') {
     const prev = [item.status, item.reason ?? null, item.reasonText ?? '']
     api.setStatus(list.id, item.id, user, status, reason, reasonText)
-    const text = status === 'bought' ? `„${item.name}” cumpărat`
-      : status === 'skipped' ? `„${item.name}”: ${reasonLabel({ reason, reasonText })}`
-      : `„${item.name}” e din nou pe listă`
+    const text = status === 'bought' ? t('toastBought', item.name)
+      : status === 'skipped' ? t('toastSkipped', item.name, reasonLabel({ reason, reasonText }))
+      : t('toastBack', item.name)
     toast(text, () => api.setStatus(list.id, item.id, user, ...prev))
   }
 
   function add({ name, quantity = '' }, quiet = false) {
     const n = name.trim()
     const dup = pending.find((i) => normalize(i.name) === normalize(n))
-    if (dup) { if (!quiet) toast(`„${dup.name}” e deja pe listă`); return false }
+    if (dup) { if (!quiet) toast(t('alreadyOnList', dup.name)); return false }
     const known = productMap.get(productKey(n))
     const aisle = known?.aisle && aisles.some((a) => a.id === known.aisle) ? known.aisle : guessAisle(n, aisles)
     api.addItem(list.id, user, { name: n, quantity, aisle })
@@ -71,16 +73,16 @@ export function ListView({ list, user }) {
       ;(add(p, true) ? added : already).push(p.name)
     }
     const parts = []
-    if (added.length) parts.push(`Am adăugat: ${added.join(', ')}`)
-    if (already.length) parts.push(`deja pe listă: ${already.join(', ')}`)
-    toast(parts.join('; ') || 'N-am găsit niciun produs.')
+    if (added.length) parts.push(t('addedMany', added.join(', ')))
+    if (already.length) parts.push(t('alreadyMany', already.join(', ')))
+    toast(parts.join('; ') || t('noneFound'))
     return added.length > 0
   }
 
   function finish() {
-    if (!window.confirm(`Scoți de pe listă cele ${done.length} produse rezolvate? Cele amânate rămân pe listă.`)) return
+    if (!window.confirm(t('finishConfirm', done.length))) return
     api.finishTrip(list.id, done)
-    toast('Listă curățată')
+    toast(t('listCleared'))
   }
 
   function openChat(item) {
@@ -117,11 +119,11 @@ export function ListView({ list, user }) {
       <ShopMode list={list} user={user} pendingCount={pending.length} />
 
       {pending.length === 0 ? (
-        <p className="center muted pad">{done.length ? 'Gata, totul e rezolvat!' : 'Lista e goală. Adaugă primul produs mai sus.'}</p>
+        <p className="center muted pad">{done.length ? t('allDone') : t('emptyList')}</p>
       ) : groups ? (
         groups.map((g) => (
           <section key={g.aisle.id} className="aisle">
-            <h3 className="aisle-head"><span aria-hidden="true">{g.aisle.icon}</span> {g.aisle.label} <span className="muted">{g.items.length}</span></h3>
+            <h3 className="aisle-head"><span aria-hidden="true">{g.aisle.icon}</span> {aisleLabel(g.aisle)} <span className="muted">{g.items.length}</span></h3>
             <ul className="items">{g.items.map(row)}</ul>
           </section>
         ))
@@ -133,9 +135,9 @@ export function ListView({ list, user }) {
         <section className="done">
           <div className="done-head">
             <button className="done-toggle" onClick={() => setShowDone((v) => !v)} aria-expanded={showDone}>
-              <IconChevron className={showDone ? '' : 'rot'} /> Rezolvate ({done.length})
+              <IconChevron className={showDone ? '' : 'rot'} /> {t('resolvedCount', done.length)}
             </button>
-            <button className="btn small" onClick={finish}>Golește rezolvatele</button>
+            <button className="btn small" onClick={finish}>{t('clearResolved')}</button>
           </div>
           {showDone && <ul className="items">{done.map(row)}</ul>}
         </section>
@@ -167,7 +169,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     // Unde microfonul aplicației nu a mers, folosim direct dictarea de pe tastatură.
     if (store.get(KEYBOARD_VOICE_KEY)) {
       ref.current?.focus()
-      toast('Apasă microfonul de pe tastatură și spune produsele cu „și” sau „virgulă” între ele.')
+      toast(t('keyboardVoiceHint'))
       return
     }
     setListening(true)
@@ -201,7 +203,7 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     // Cu virgule și fără cantitate separată: sunt mai multe produse („lapte, ouă, două pâini”).
     // Unde vocea merge prin tastatură, despărțim și după „și” (dictarea pune rar virgule).
     const spoken = !!store.get(KEYBOARD_VOICE_KEY)
-    const many = !qty.trim() && (/[,;]/.test(name) || (spoken && /\s(și|si)\s/i.test(name))) ? parseProducts(name, { spoken }) : null
+    const many = !qty.trim() && (/[,;]/.test(name) || (spoken && hasSpokenAnd(name))) ? parseProducts(name, { spoken }) : null
     if (many && many.length > 1 ? onAddMany(many) : onAdd({ name, quantity: qty })) { setName(''); setQty('') }
     ref.current?.focus()
   }
@@ -215,20 +217,20 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
     <div className="add-wrap">
       <form className="add" onSubmit={submit}>
         <input ref={ref} className="add-name" value={name} onChange={(e) => setName(e.target.value)}
-          placeholder={listening ? 'Te ascult…' : 'Ce trebuie cumpărat?'} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label="Produs" />
+          placeholder={listening ? t('listening') : t('addPh')} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label={t('productLabel')} />
         <input className="add-qty" value={qty} onChange={(e) => setQty(e.target.value)}
-          placeholder="Cant." maxLength={20} enterKeyHint="done" autoComplete="off" aria-label="Cantitate" />
+          placeholder={t('qtyPh')} maxLength={20} enterKeyHint="done" autoComplete="off" aria-label={t('qtyLabel')} />
         {speechSupported() && (listening || !name.trim()) ? (
           <button type="button" className={`add-btn mic ${listening ? 'listening' : ''}`} onClick={voice}
-            aria-label={listening ? 'Oprește ascultarea' : 'Spune ce trebuie cumpărat'}>
+            aria-label={listening ? t('stopListening') : t('speakItems')}>
             <IconMic />
           </button>
         ) : (
-          <button className="add-btn" disabled={!name.trim()} aria-label="Adaugă"><IconPlus /></button>
+          <button className="add-btn" disabled={!name.trim()} aria-label={t('add')}><IconPlus /></button>
         )}
       </form>
       {suggestions.length > 0 && (
-        <div className="suggestions" aria-label="Sugestii din istoric">
+        <div className="suggestions" aria-label={t('historySuggestions')}>
           {suggestions.map((p) => (
             <button key={p.id} type="button" className="chip" onClick={() => pick(p)}>
               {p.name}{p.quantity && <span className="muted"> · {p.quantity}</span>}
@@ -243,14 +245,14 @@ function AddForm({ onAdd, onAddMany, products, pending, enabled }) {
 function ItemRow({ item, now, unread, onCheck, onSkip, onEdit, onChat }) {
   const isDone = item.status !== 'pending'
   let meta
-  if (item.status === 'bought') meta = `cumpărat de ${firstName(item.resolvedBy?.name)} · ${relTime(item.resolvedAt, now)}`
+  if (item.status === 'bought') meta = t('metaBought', firstName(item.resolvedBy?.name), relTime(item.resolvedAt, now))
   else if (item.status === 'skipped') meta = `${reasonLabel(item)} · ${firstName(item.resolvedBy?.name)}`
-  else meta = `${firstName(item.addedBy?.name)} · ${relTime(item.addedAt, now)}` + (item.postponed ? ` · amânat ${item.postponed}×` : '')
+  else meta = `${firstName(item.addedBy?.name)} · ${relTime(item.addedAt, now)}` + (item.postponed ? t('metaPostponed', item.postponed) : '')
 
   return (
     <li className={`item ${item.status}`}>
       <button className="check" onClick={onCheck}
-        aria-label={isDone ? `Pune „${item.name}” înapoi pe listă` : `Marchează „${item.name}” cumpărat`}>
+        aria-label={isDone ? t('putBack', item.name) : t('markBought', item.name)}>
         {item.status === 'bought' && <IconCheck />}
         {item.status === 'skipped' && <IconX />}
       </button>
@@ -264,13 +266,13 @@ function ItemRow({ item, now, unread, onCheck, onSkip, onEdit, onChat }) {
       </button>
       {(!isDone || item.msgCount > 0) && (
         <button className={`chat-btn ${item.msgCount ? 'has' : ''}`} onClick={onChat}
-          aria-label={`Discuție despre „${item.name}”${item.msgCount ? `, ${item.msgCount} mesaje` : ''}${unread ? ', mesaje noi' : ''}`}>
+          aria-label={t('chatAbout', item.name, item.msgCount, unread)}>
           <IconChat />
           {item.msgCount > 0 && <span className="chat-count">{item.msgCount}</span>}
           {unread && <span className="dot" />}
         </button>
       )}
-      {!isDone && <button className="skip-btn" onClick={onSkip}>Nu iau</button>}
+      {!isDone && <button className="skip-btn" onClick={onSkip}>{t('skip')}</button>}
     </li>
   )
 }
@@ -278,15 +280,15 @@ function ItemRow({ item, now, unread, onCheck, onSkip, onEdit, onChat }) {
 function SkipSheet({ item, onPick, onClose }) {
   const [text, setText] = useState('')
   return (
-    <Sheet title={`De ce nu iei „${item.name}”?`} onClose={onClose}>
+    <Sheet title={t('skipTitle', item.name)} onClose={onClose}>
       <div className="choices">
         {SKIP_REASONS.map((r) => (
           <button key={r.id} className="choice" onClick={() => onPick(r.id, '')}>{r.label}</button>
         ))}
       </div>
       <form className="row" onSubmit={(e) => { e.preventDefault(); if (text.trim()) onPick(CUSTOM, text.trim()) }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Alt motiv…" maxLength={80} />
-        <button className="btn" disabled={!text.trim()}>Salvează</button>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('otherReasonPh')} maxLength={80} />
+        <button className="btn" disabled={!text.trim()}>{t('save')}</button>
       </form>
     </Sheet>
   )
@@ -307,33 +309,33 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
     onClose()
   }
   function remove() {
-    if (!window.confirm(`Ștergi „${item.name}”${item.msgCount ? ' și discuția lui' : ''}?`)) return
+    if (!window.confirm(t('deleteItemConfirm', item.name, !!item.msgCount))) return
     api.deleteItem(list.id, item)
     onClose()
   }
   return (
-    <Sheet title="Modifică produsul" onClose={onClose}>
+    <Sheet title={t('editTitle')} onClose={onClose}>
       <form className="stack" onSubmit={save}>
-        <label>Produs<input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></label>
+        <label>{t('productLabel')}<input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></label>
         <div className="row tight">
-          <label className="grow">Cantitate<input value={qty} onChange={(e) => setQty(e.target.value)} maxLength={20} placeholder="ex. 2 buc" /></label>
-          <label className="grow">Raion
+          <label className="grow">{t('qtyLabel')}<input value={qty} onChange={(e) => setQty(e.target.value)} maxLength={20} placeholder={t('qtyEx')} /></label>
+          <label className="grow">{t('aisle')}
             <select value={aisle} onChange={(e) => setAisle(e.target.value)}>
-              {aisles.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
+              {aisles.map((a) => <option key={a.id} value={a.id}>{a.icon} {aisleLabel(a)}</option>)}
             </select>
           </label>
         </div>
-        <label>Notă<input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="ex. marca X, fără lactoză" /></label>
+        <label>{t('note')}<input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={t('noteEx')} /></label>
         <button type="button" className="btn wide-left" onClick={onChat}>
-          <IconChat /> {item.msgCount ? `Discuție (${item.msgCount} mesaje)` : 'Întreabă ceva despre produs'}
+          <IconChat /> {item.msgCount ? t('chatWithCount', item.msgCount) : t('askAbout')}
         </button>
         <p className="muted small">
-          Adăugat de {item.addedBy?.name} {fullDate(item.addedAt) && `· ${fullDate(item.addedAt)}`}
-          {item.resolvedBy && <><br />{item.status === 'bought' ? 'Cumpărat' : 'Rezolvat'} de {item.resolvedBy.name} · {fullDate(item.resolvedAt)}</>}
+          {t('addedBy', item.addedBy?.name)} {fullDate(item.addedAt) && `· ${fullDate(item.addedAt)}`}
+          {item.resolvedBy && <><br />{t(item.status === 'bought' ? 'boughtBy' : 'resolvedBy', item.resolvedBy.name)} · {fullDate(item.resolvedAt)}</>}
         </p>
         <div className="row">
-          <button type="button" className="btn danger" onClick={remove}>Șterge</button>
-          <button className="btn primary grow" disabled={!name.trim()}>Salvează</button>
+          <button type="button" className="btn danger" onClick={remove}>{t('delete')}</button>
+          <button className="btn primary grow" disabled={!name.trim()}>{t('save')}</button>
         </div>
       </form>
     </Sheet>
@@ -364,11 +366,11 @@ function ShopMode({ list, user, pendingCount }) {
     const arm = () => {
       last = Date.now()
       clearTimeout(timer)
-      timer = setTimeout(() => stop('Mod magazin oprit după 10 minute fără activitate'), IDLE_MS)
+      timer = setTimeout(() => stop(t('shopIdleStop')), IDLE_MS)
     }
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
-      if (Date.now() - last > IDLE_MS) stop('Mod magazin oprit după 10 minute fără activitate')
+      if (Date.now() - last > IDLE_MS) stop(t('shopIdleStop'))
       else acquire()
     }
     acquire()
@@ -386,11 +388,11 @@ function ShopMode({ list, user, pendingCount }) {
   }, [on, toast])
 
   useEffect(() => {
-    if (on && pendingCount === 0) { setOn(false); toast('Lista e gata: mod magazin oprit') }
+    if (on && pendingCount === 0) { setOn(false); toast(t('shopDoneStop')) }
   }, [on, pendingCount, toast])
 
   function start() {
-    if (!('wakeLock' in navigator)) { toast('Telefonul ăsta nu permite ținerea ecranului aprins din aplicație'); return }
+    if (!('wakeLock' in navigator)) { toast(t('shopNoWakeLock')); return }
     setOn(true)
   }
 
@@ -403,16 +405,16 @@ function ShopMode({ list, user, pendingCount }) {
 
   if (!on) {
     return pendingCount > 0 ? (
-      <button className="shop-start" onClick={start}>🛒 Mod magazin <span className="muted small">ecranul rămâne aprins</span></button>
+      <button className="shop-start" onClick={start}>🛒 {t('shopMode')} <span className="muted small">{t('shopModeHint')}</span></button>
     ) : null
   }
   return (
     <div className="shop-bar" role="status">
-      <span className="grow">🛒 Mod magazin: ecranul rămâne aprins</span>
+      <span className="grow">{t('shopBar')}</span>
       {list.memberEmails.length > 1 && (
-        <button className="btn small" disabled={busy} onClick={announceShop}>Anunță că sunt aici</button>
+        <button className="btn small" disabled={busy} onClick={announceShop}>{t('shopAnnounce')}</button>
       )}
-      <button className="btn small" onClick={() => setOn(false)}>Oprește</button>
+      <button className="btn small" onClick={() => setOn(false)}>{t('stop')}</button>
     </div>
   )
 }

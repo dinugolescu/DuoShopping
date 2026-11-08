@@ -4,6 +4,17 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.3', date: '2026-11-08',
+    ro: [
+      'Discuție pentru toată lista: butonul cu bulă de lângă clopoțel. Bulina roșie arată câte mesaje noi ai.',
+      'Anunțurile primite („Gata, anunță”) rămân în discuția listei, iar ultimul apare sus, peste listă, până îl citești. Nu se mai pierd dacă atingi notificarea prea repede.',
+    ],
+    en: [
+      'A chat for the whole list: the speech-bubble button next to the bell. The red badge shows how many new messages you have.',
+      'Announcements you receive (“Done, announce”) stay in the list chat, and the latest one shows at the top of the list until you read it. They’re no longer lost if you tap the notification too fast.',
+    ],
+  },
+  {
     v: '2.2', date: '2026-11-08',
     ro: [
       'Notificările ajung pe telefonul cu aplicația de pe adresa nouă, iar atingerea lor deschide aplicația, nu browserul.',

@@ -144,6 +144,13 @@ export default {
   // ---------- Chat ----------
   deleteMsgConfirm: 'Delete this message?',
   chatTitle: (name) => `Chat: ${name}`,
+  listChatTitle: (name) => `Chat: ${name} (whole list)`,
+  listChatEmpty: 'Talk about the whole list here. Announcements you receive (“Done, announce”) stay here too, so you can read them even after tapping the notification.',
+  listChat: 'List chat',
+  listChatNew: (n) => `List chat, ${n} new ${n === 1 ? 'message' : 'messages'}`,
+  announceMsg: 'Announcement',
+  announceFrom: (name) => `Announcement from ${name}`,
+  dismiss: 'Got it',
   chatEmpty: 'No questions yet. E.g. “Which coffee?” or send a photo of the shelf: “This is all they have, which one?”',
   msgFrom: (name) => `Message from ${name}. Tap for reactions.`,
   chatPhotoAlt: 'Photo sent in the chat',

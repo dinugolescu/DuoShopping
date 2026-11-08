@@ -139,6 +139,13 @@ export default {
   // ---------- Discuția ----------
   deleteMsgConfirm: 'Ștergi mesajul?',
   chatTitle: (name) => `Discuție: ${name}`,
+  listChatTitle: (name) => `Discuție: ${name} (toată lista)`,
+  listChatEmpty: 'Aici vorbiți despre toată lista. Tot aici rămân și anunțurile primite („Gata, anunță”), ca să le poți citi și după ce ai atins notificarea.',
+  listChat: 'Discuția listei',
+  listChatNew: (n) => `Discuția listei, ${n} ${n === 1 ? 'mesaj nou' : 'mesaje noi'}`,
+  announceMsg: 'Anunț',
+  announceFrom: (name) => `Anunț de la ${name}`,
+  dismiss: 'Am citit',
   chatEmpty: 'Nicio întrebare încă. Ex.: „De care cafea?” sau trimite o poză cu raftul: „Doar astea sunt, pe care o iei?”',
   msgFrom: (name) => `Mesaj de la ${name}. Apasă pentru reacții.`,
   chatPhotoAlt: 'Poză trimisă în discuție',

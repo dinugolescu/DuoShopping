@@ -105,6 +105,7 @@ export function renameList(listId, name) {
 export async function deleteList(listId) {
   mutate((db) => {
     for (const itemId of Object.keys(db.items[listId] || {})) { delete db.messages[itemId]; delete db.messages[`s:${itemId}`] }
+    delete db.messages[`l:${listId}`]
     delete db.lists[listId]; delete db.items[listId]; delete db.products[listId]; delete db.secret?.[listId]
   })
 }
@@ -267,18 +268,25 @@ export function watchProducts(listId, cb) {
 // ---------- Discuția unui produs ----------
 
 // Mesajele discuției ascunse (scope 'secret') stau sub cheia `s:<id>`; contorul lor pe partea ascunsă.
-const msgKey = (itemId, scope) => (scope === 'secret' ? `s:${itemId}` : itemId)
-const counterOf = (db, listId, itemId, scope) => (scope === 'secret' ? secretOf(db, listId, itemId) : db.items[listId][itemId])
+// Discuția listei (scope 'list') stă sub cheia `l:<listId>` și n-are contor.
+const msgKey = (itemId, scope, listId) => (scope === 'list' ? `l:${listId}` : scope === 'secret' ? `s:${itemId}` : itemId)
+const NO_COUNTER = {}
+const counterOf = (db, listId, itemId, scope) => (scope === 'list' ? NO_COUNTER
+  : scope === 'secret' ? secretOf(db, listId, itemId) : db.items[listId][itemId])
 
 export function watchMessages(listId, itemId, cb, onError, scope) {
-  return watch((db) => Object.values(db.messages[msgKey(itemId, scope)] || {}).sort((a, b) => a.at - b.at), cb)
+  return watch((db) => Object.values(db.messages[msgKey(itemId, scope, listId)] || {}).sort((a, b) => a.at - b.at), cb)
+}
+
+export function watchListChat(listId, cb) {
+  return watch((db) => Object.values(db.messages[`l:${listId}`] || {}).sort((a, b) => b.at - a.at).slice(0, 20), cb)
 }
 
 export function sendMessage(listId, itemId, user, { text = '', photo = null }, scope) {
   mutate((db) => {
     const id = newId()
     const at = Date.now()
-    const k = msgKey(itemId, scope)
+    const k = msgKey(itemId, scope, listId)
     db.messages[k] ??= {}
     db.messages[k][id] = { id, text: text.trim(), photo, by: who(user), at, reactions: {} }
     const it = counterOf(db, listId, itemId, scope)
@@ -288,7 +296,7 @@ export function sendMessage(listId, itemId, user, { text = '', photo = null }, s
 
 export function toggleReaction(listId, itemId, msgId, reactionId, uid, on, scope) {
   mutate((db) => {
-    const m = db.messages[msgKey(itemId, scope)][msgId]
+    const m = db.messages[msgKey(itemId, scope, listId)][msgId]
     const set = new Set(m.reactions[reactionId] || [])
     on ? set.add(uid) : set.delete(uid)
     m.reactions[reactionId] = [...set]
@@ -297,7 +305,7 @@ export function toggleReaction(listId, itemId, msgId, reactionId, uid, on, scope
 
 export function deleteMessage(listId, itemId, msgId, scope) {
   mutate((db) => {
-    delete db.messages[msgKey(itemId, scope)][msgId]
+    delete db.messages[msgKey(itemId, scope, listId)][msgId]
     const it = counterOf(db, listId, itemId, scope)
     it.msgCount = Math.max(0, (it.msgCount || 1) - 1)
   })
@@ -332,6 +340,13 @@ export const pushStatus = () => 'unsupported'
 export async function enablePush() { throw new Error(t('pushDemo')) }
 export async function disablePush() {}
 export async function refreshPush() {}
-export async function announce() {
+// Ca în cloud: anunțul rămâne și în discuția listei.
+export async function announce(listId, text) {
+  const user = currentUser()
+  mutate((db) => {
+    const id = newId()
+    db.messages[`l:${listId}`] ??= {}
+    db.messages[`l:${listId}`][id] = { id, text: text.trim().slice(0, 1000), photo: null, by: who(user), at: Date.now(), reactions: {}, announce: true }
+  })
   return { phones: 0, withoutPhone: [], demo: true }
 }

@@ -5,7 +5,7 @@ import {
 } from 'firebase/auth'
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, limit,
+  collection, doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, limit, limitToLast,
   serverTimestamp, arrayUnion, arrayRemove, increment, writeBatch, FieldPath,
 } from 'firebase/firestore'
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
@@ -131,7 +131,10 @@ const itemsCol = (listId) => collection(db, 'lists', listId, 'items')
 const itemDoc = (listId, id) => doc(db, 'lists', listId, 'items', id)
 // `scope`: 'items' pentru discuția obișnuită a produsului; 'secret' pentru partea ascunsă a unei liste de
 // cadouri (cine a rezervat, ce s-a luat, discuția doar între cei care cumpără).
-const msgsCol = (listId, itemId, scope = 'items') => collection(db, 'lists', listId, scope, itemId, 'messages')
+// `scope` 'list': discuția întregii liste (`lists/{id}/chat`), unde ajung și anunțurile („Gata, anunță”).
+const msgsCol = (listId, itemId, scope = 'items') => (scope === 'list'
+  ? collection(db, 'lists', listId, 'chat')
+  : collection(db, 'lists', listId, scope, itemId, 'messages'))
 const secretCol = (listId) => collection(db, 'lists', listId, 'secret')
 const secretDoc = (listId, id) => doc(db, 'lists', listId, 'secret', id)
 const productsCol = (listId) => collection(db, 'lists', listId, 'products')
@@ -327,13 +330,22 @@ export function watchProducts(listId, cb) {
 // ---------- Discuția unui produs ----------
 
 export function watchMessages(listId, itemId, cb, onError, scope) {
-  const q = query(msgsCol(listId, itemId, scope), orderBy('at'))
+  // Discuția listei crește la nesfârșit: arătăm doar ultimele 200 de mesaje.
+  const q = scope === 'list'
+    ? query(msgsCol(listId, itemId, scope), orderBy('at'), limitToLast(200))
+    : query(msgsCol(listId, itemId, scope), orderBy('at'))
   return listen(q, cb, onError)
 }
 
+// Ultimele mesaje din discuția listei (pentru bulina de necitite și anunțul de sus).
+export function watchListChat(listId, cb, onError) {
+  return listen(query(msgsCol(listId, null, 'list'), orderBy('at', 'desc'), limit(20)), cb, onError)
+}
+
 // Contorul de mesaje stă pe produs (discuția obișnuită) sau pe partea lui ascunsă (scope 'secret').
-const counter = (b, listId, itemId, scope, fields) => (scope === 'secret'
-  ? b.set(secretDoc(listId, itemId), fields, { merge: true })
+// Discuția listei n-are contor: se numără din mesajele ei.
+const counter = (b, listId, itemId, scope, fields) => (scope === 'list' ? null
+  : scope === 'secret' ? b.set(secretDoc(listId, itemId), fields, { merge: true })
   : b.update(itemDoc(listId, itemId), fields))
 
 export function sendMessage(listId, itemId, user, { text = '', photo = null }, scope) {

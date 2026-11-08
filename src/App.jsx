@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import * as api from './data/index.js'
-import { ToastHost, useToast, errText, store } from './ui.jsx'
+import { ToastHost, useToast, errText, store, firstName } from './ui.jsx'
 import { ListView } from './ListView.jsx'
 import { GiftListView } from './GiftList.jsx'
 import { isGiftList, receivesIn } from './gifts.js'
 import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet, useAnnounce } from './sheets.jsx'
-import { IconChevron, IconUsers, IconBell } from './icons.jsx'
+import { IconChevron, IconUsers, IconBell, IconChat, IconX } from './icons.jsx'
+import { ChatSheet, useListChat } from './Chat.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
 import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt, Welcome, LangPicker, showWelcome, tipsSeen } from './onboarding.jsx'
@@ -159,6 +160,10 @@ function Home({ user, admin }) {
   const iReceive = receivesIn(current, user)
   const ann = useAnnounce(iReceive ? null : current, user)
   const unannounced = current && current.memberEmails.length > 1 ? ann.pending?.length || 0 : 0
+  // Discuția listei (cu anunțurile primite). Cine primește cadouri n-o vede.
+  const chat = useListChat(iReceive ? null : current, user)
+  const showChat = current && !iReceive && (current.memberEmails.length > 1 || chat.count > 0)
+  const closeChat = () => { chat.markSeen(); close() }
 
   if (!sorted) return <div className="center muted">{t('loadingLists')}</div>
 
@@ -176,6 +181,13 @@ function Home({ user, admin }) {
             {unannounced > 0 && <span className="count">{unannounced > 99 ? '99+' : unannounced}</span>}
           </button>
         )}
+        {showChat && (
+          <button className="icon-btn" onClick={() => setSheet('chat')}
+            aria-label={chat.unread ? t('listChatNew', chat.unread) : t('listChat')}>
+            <IconChat />
+            {chat.unread > 0 && <span className="count alert">{chat.unread > 9 ? '9+' : chat.unread}</span>}
+          </button>
+        )}
         {current && (
           <button className={`icon-btn ${alone ? 'alone' : ''}`} onClick={() => setSheet('share')}
             aria-label={alone ? t('aloneInvite') : t('whoSees')}>
@@ -191,6 +203,15 @@ function Home({ user, admin }) {
         <div className="hint-bar alone-bar">
           <button className="grow hint-main" onClick={() => setSheet('share')}>{t('aloneBar')}</button>
           <button className="btn small" onClick={markPersonal}>{t('itsPersonal')}</button>
+        </div>
+      )}
+      {chat.banner && sheet !== 'chat' && (
+        <div className="hint-bar announce-bar" role="status">
+          <button className="grow hint-main" onClick={() => setSheet('chat')}>
+            <span className="announce-from">📣 {t('announceFrom', firstName(chat.banner.by?.name))}</span>
+            <span className="announce-text">{chat.banner.text}</span>
+          </button>
+          <button className="icon-btn" onClick={chat.markSeen} aria-label={t('dismiss')}><IconX /></button>
         </div>
       )}
       {current && tipsDone && <PushPrompt user={user} />}
@@ -219,6 +240,7 @@ function Home({ user, admin }) {
       {sheet === 'aisles' && current && <AislesSheet list={current} onClose={close} />}
       {sheet === 'invite-app' && <InviteAppSheet user={user} onClose={close} />}
       {sheet === 'install' && <InstallSheet onClose={close} />}
+      {sheet === 'chat' && current && !iReceive && <ChatSheet list={current} user={user} scope="list" onClose={closeChat} />}
       {sheet === 'history' && current && <HistorySheet list={current} user={user} onClose={close} />}
     </div>
   )

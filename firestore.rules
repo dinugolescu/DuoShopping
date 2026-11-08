@@ -144,6 +144,22 @@ service cloud.firestore {
         allow read, write: if isBuyer(list());
       }
 
+      // Discuția întregii liste. Aici ajung și anunțurile („Gata, anunță”), scrise de funcția `announce`
+      // (cu `announce: true`; aplicația nu poate scrie singură un anunț). Pe o listă de cadouri, cine
+      // primește cadouri n-o vede (anunțurile vorbesc despre ce s-a luat).
+      match /chat/{msgId} {
+        allow read: if isBuyer(list());
+        allow delete: if isBuyer(list()) && resource.data.by.uid == request.auth.uid;
+        allow create: if isBuyer(list())
+          && request.resource.data.keys().hasOnly(['text', 'photo', 'by', 'at', 'reactions'])
+          && request.resource.data.by.uid == request.auth.uid
+          && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+          && (request.resource.data.photo == null
+              || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
+        allow update: if isBuyer(list())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+      }
+
       // Partea ascunsă a unei dorințe: rezervarea, cumpărarea și discuția celor care cumpără.
       match /secret/{itemId} {
         allow read, write: if isGift(list()) && isBuyer(list());

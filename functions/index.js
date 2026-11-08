@@ -41,8 +41,19 @@ export const announce = onCall(async (req) => {
 
   // Pe o listă de cadouri, cei care primesc cadouri nu primesc anunțurile (ar strica surpriza).
   const recipients = list.kind === 'gifts' ? list.recipients || [] : []
+  if (recipients.includes(email)) throw new HttpsError('permission-denied', 'Pe lista asta primești cadouri.')
   const others = list.memberEmails.filter((e) => e !== email && !recipients.includes(e))
   if (!others.length) return { phones: 0, withoutPhone: [] }
+
+  // Anunțul rămâne și în discuția listei: dacă cineva atinge notificarea prea repede, îl citește acolo.
+  await db.collection(`lists/${listId}/chat`).add({
+    text: text.trim().slice(0, 1000),
+    photo: null,
+    by: { uid: req.auth.uid, name: token.name || email },
+    at: FieldValue.serverTimestamp(),
+    reactions: {},
+    announce: true,
+  })
 
   const tokSnap = await db.collection('pushTokens').where('email', 'in', others.slice(0, 30)).get()
   // Aplicația s-a mutat de pe duoshopping-9d75f.web.app. Codurile salvate de acolo (sau dinainte să ținem

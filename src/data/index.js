@@ -11,7 +11,7 @@ export const {
   watchItems, watchWishes, addItem, updateItem, setItemAisle, deleteItem, setStatus, finishTrip,
   watchSecret, setGiftStatus,
   watchProducts, watchHistory,
-  watchMessages, sendMessage, toggleReaction, deleteMessage,
+  watchMessages, watchListChat, sendMessage, toggleReaction, deleteMessage,
   watchAllLists, watchAllowed, revokeAccess,
   loadUserPrefs, saveUserPrefs,
   watchAnnounced, saveAnnounced,

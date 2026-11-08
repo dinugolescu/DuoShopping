@@ -149,6 +149,36 @@ export function removeMember(list, email) {
 
 export const leaveList = (list, user) => removeMember(list, user.email)
 
+export function addNamedRecipient(listId, name) {
+  const id = `name:${newId()}`
+  mutate((db) => {
+    const l = db.lists[listId]
+    l.recipients = [...(l.recipients || []), id]
+    l.recipientNames = { ...l.recipientNames, [id]: name.trim() }
+  })
+  return id
+}
+
+export function setRecipientName(listId, id, name) {
+  mutate((db) => {
+    const l = db.lists[listId]
+    const names = { ...l.recipientNames }
+    if (name.trim()) names[id] = name.trim()
+    else delete names[id]
+    l.recipientNames = names
+  })
+}
+
+export function removeNamedRecipient(listId, id) {
+  mutate((db) => {
+    const l = db.lists[listId]
+    l.recipients = (l.recipients || []).filter((r) => r !== id)
+    const names = { ...l.recipientNames }
+    delete names[id]
+    l.recipientNames = names
+  })
+}
+
 export function setReceives(listId, email, receives) {
   const e = normEmail(email)
   mutate((db) => {
@@ -301,6 +331,10 @@ export function toggleReaction(listId, itemId, msgId, reactionId, uid, on, scope
     on ? set.add(uid) : set.delete(uid)
     m.reactions[reactionId] = [...set]
   })
+}
+
+export function deleteMessagePhoto(listId, itemId, msgId, scope) {
+  mutate((db) => { Object.assign(db.messages[msgKey(itemId, scope, listId)][msgId], { photo: null, photoDeleted: true }) })
 }
 
 export function deleteMessage(listId, itemId, msgId, scope) {

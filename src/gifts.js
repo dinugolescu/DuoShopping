@@ -4,6 +4,17 @@ import * as api from './data/index.js'
 export const isGiftList = (list) => list?.kind === 'gifts'
 export const receivesIn = (list, user) => isGiftList(list) && (list.recipients || []).includes(user.email)
 
+// Cine primește cadouri e o adresă de email (are cont) sau doar un nume, fără cont: `name:<id>`.
+export const isNamedRecipient = (id) => String(id || '').startsWith('name:')
+
+// Numele afișat: cel pus de creatorul listei, altfel cel din cont (din dorințele lui), altfel din email.
+export function recipientName(list, id, items = []) {
+  return list?.recipientNames?.[id]
+    || items.find((i) => i.for === id && i.forName && !i.idea)?.forName
+    || items.find((i) => i.for === id && i.forName)?.forName
+    || (isNamedRecipient(id) ? '?' : String(id).split('@')[0])
+}
+
 // Dorințele, cu partea ascunsă (rezervare, cumpărare, discuția celor care cumpără) pusă peste ele.
 export function mergeSecret(items, secret) {
   const byId = new Map(secret.map((s) => [s.id, s]))

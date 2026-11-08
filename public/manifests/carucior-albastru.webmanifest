@@ -9,6 +9,15 @@
   "display": "standalone",
   "background_color": "#f5f6f2",
   "theme_color": "#2e7d4f",
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "shared_title",
+      "text": "shared_text",
+      "url": "shared_url"
+    }
+  },
   "icons": [
     {
       "src": "/icons/carucior-albastru-192.png",

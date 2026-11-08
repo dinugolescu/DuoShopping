@@ -4,6 +4,21 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.4', date: '2026-11-08',
+    ro: [
+      'Mesajele și pozele din discuții le poate șterge cine le-a scris sau creatorul listei. Poza se poate șterge și singură, textul rămâne.',
+      'Lipește un link de produs în câmpul de adăugare: numele se ghicește din adresă (sau devine „Produs necunoscut 1”), iar linkul rămâne la produs. Produsele au acum și câmp de link.',
+      'Pe Android, din aplicația instalată: „Share” din alt site sau aplicație → DuoShopping → alegi lista și produsul e adăugat cu link cu tot.',
+      'Listele de cadouri: poți adăuga pe cineva care primește cadouri doar cu numele, fără cont (ex. Bunica), iar creatorul listei poate schimba numele afișate.',
+    ],
+    en: [
+      'Chat messages and photos can be deleted by whoever wrote them or by the list creator. A photo can be deleted on its own; the text stays.',
+      'Paste a product link in the add field: the name is guessed from the address (or becomes “Unknown product 1”) and the link stays with the item. Items now have a link field.',
+      'On Android, from the installed app: “Share” from another site or app → DuoShopping → pick the list and the item is added with its link.',
+      'Gift lists: add someone who receives gifts by name only, without an account (e.g. Grandma), and the list creator can change the names shown.',
+    ],
+  },
+  {
     v: '2.3', date: '2026-11-08',
     ro: [
       'Discuție pentru toată lista: butonul cu bulă de lângă clopoțel. Bulina roșie arată câte mesaje noi ai.',

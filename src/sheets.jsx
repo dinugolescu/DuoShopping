@@ -10,7 +10,7 @@ import { reasonLabel } from './config.js'
 import { InviteShare, isInstalled, IconPicker, LangPicker } from './onboarding.jsx'
 import { t, locale } from './i18n.jsx'
 import { CHANGELOG, VERSION, changes } from './changelog.js'
-import { isGiftList, receivesIn, watchGiftItems } from './gifts.js'
+import { isGiftList, receivesIn, watchGiftItems, recipientName, isNamedRecipient } from './gifts.js'
 
 const people = (n) => t('people', n)
 const products = (n) => t('products', n)
@@ -156,6 +156,7 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
           </li>
         ))}
       </ul>
+      {gift && !iReceive && <RecipientsBox list={list} isOwner={isOwner} />}
       {!iReceive && (
         <>
           {gift && (
@@ -180,6 +181,59 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
         <button className="btn danger wide" onClick={leave}>{t('leaveList')}</button>
       )}
     </Sheet>
+  )
+}
+
+// Lista de cadouri: cine primește cadouri, cu numele afișat în listă. Creatorul listei le schimbă numele
+// și poate adăuga pe cineva doar cu numele (fără cont și fără aplicație, ex. „Bunica”); ideile pentru
+// el le adaugă cei care cumpără.
+function RecipientsBox({ list, isOwner }) {
+  const [name, setName] = useState('')
+  const [items, setItems] = useState([]) // pentru numele din cont, cât creatorul nu le-a schimbat
+  useEffect(() => api.watchItems(list.id, setItems), [list.id])
+  const recipients = list.recipients || []
+  const nameOf = (id) => recipientName(list, id, items)
+
+  function rename(id) {
+    const v = window.prompt(t('renameRecipient'), nameOf(id))
+    if (v !== null && v.trim()) api.setRecipientName(list.id, id, v.slice(0, 40))
+  }
+  function remove(id) {
+    if (!window.confirm(t('removeNamedConfirm', nameOf(id)))) return
+    api.removeNamedRecipient(list.id, id)
+  }
+  function add(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    api.addNamedRecipient(list.id, name.slice(0, 40))
+    setName('')
+  }
+
+  return (
+    <>
+      <h3>{t('recipientsTitle')}</h3>
+      {recipients.length === 0 && <p className="muted small">{t('noRecipientsYet')}</p>}
+      <ul className="members">
+        {recipients.map((id) => (
+          <li key={id}>
+            <span className="grow">
+              🎁 {nameOf(id)}
+              <span className="muted small block">{isNamedRecipient(id) ? t('noAccount') : id}</span>
+            </span>
+            {isOwner && <button className="btn small" onClick={() => rename(id)}>{t('rename')}</button>}
+            {isOwner && isNamedRecipient(id) && <button className="btn small danger" onClick={() => remove(id)}>{t('remove')}</button>}
+          </li>
+        ))}
+      </ul>
+      {isOwner && (
+        <form className="row" onSubmit={add}>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder={t('namedRecipientPh')}
+            aria-label={t('namedRecipientPh')} />
+          <button className="btn" disabled={!name.trim()}>{t('add')}</button>
+        </form>
+      )}
+      <p className="muted small">{isOwner ? t('namedRecipientHint') : t('onlyOwnerNames')}</p>
+    </>
   )
 }
 

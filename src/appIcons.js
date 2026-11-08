@@ -107,6 +107,12 @@ export const APP = {
   display: 'standalone',
   background_color: '#f5f6f2',
   theme_color: '#2e7d4f',
+  // Android: aplicația instalată apare în meniul „Share” al altor aplicații (vezi src/ShareIn.jsx).
+  share_target: {
+    action: '/',
+    method: 'GET',
+    params: { title: 'shared_title', text: 'shared_text', url: 'shared_url' },
+  },
 }
 
 export function manifestIcons(key) {

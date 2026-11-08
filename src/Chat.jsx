@@ -73,9 +73,16 @@ export function ChatSheet({ list, item, user, onClose, scope }) {
     setActiveId(null)
   }
 
+  // Un mesaj (sau doar poza lui) îl șterge cine l-a scris sau creatorul listei.
+  const canDelete = (m) => m.by?.uid === user.uid || list.ownerUid === user.uid
   function remove(m) {
     if (!window.confirm(t('deleteMsgConfirm'))) return
     api.deleteMessage(list.id, item?.id, m.id, scope)
+    setActiveId(null)
+  }
+  function removePhoto(m) {
+    if (!window.confirm(t('deletePhotoConfirm'))) return
+    api.deleteMessagePhoto(list.id, item?.id, m.id, scope)
     setActiveId(null)
   }
 
@@ -118,7 +125,8 @@ export function ChatSheet({ list, item, user, onClose, scope }) {
                   {REACTIONS.map((r) => (
                     <button key={r.id} onClick={() => react(m, r)} aria-label={t('reactionLabel', r.emoji)}>{r.emoji}</button>
                   ))}
-                  {mine && <button className="danger small" onClick={() => remove(m)}>{t('delete')}</button>}
+                  {canDelete(m) && m.photo && <button className="danger small" onClick={() => removePhoto(m)}>{t('deletePhoto')}</button>}
+                  {canDelete(m) && <button className="danger small" onClick={() => remove(m)}>{t(m.photo ? 'deleteMsg' : 'delete')}</button>}
                 </div>
               )}
             </div>

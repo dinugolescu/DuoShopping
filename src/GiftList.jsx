@@ -11,9 +11,8 @@ import { ChatSheet } from './Chat.jsx'
 import { AddForm } from './ListView.jsx'
 import { IconChat, IconLock, IconLink } from './icons.jsx'
 import { t } from './i18n.jsx'
-import { receivesIn, watchGiftItems } from './gifts.js'
-
-const safeLink = (url) => (/^https?:\/\//i.test(url || '') ? url : null)
+import { receivesIn, watchGiftItems, recipientName } from './gifts.js'
+import { safeLink } from './links.js'
 
 export function GiftListView({ list, user }) {
   return receivesIn(list, user) ? <WishView list={list} user={user} /> : <BuyerView list={list} user={user} />
@@ -33,8 +32,8 @@ function WishView({ list, user }) {
   const editing = wishes.find((i) => i.id === editingId)
   const chatting = wishes.find((i) => i.id === chatId)
 
-  const add = ({ name, quantity = '' }) => {
-    api.addItem(list.id, user, { name: name.trim(), quantity, forEmail: user.email, forName: user.name }, { catalog: false })
+  const add = ({ name, quantity = '', link = '' }) => {
+    api.addItem(list.id, user, { name: name.trim(), quantity, link, forEmail: user.email, forName: user.name }, { catalog: false })
     return true
   }
   const addMany = (products) => {
@@ -46,7 +45,7 @@ function WishView({ list, user }) {
   return (
     <main className="list">
       <p className="gift-hint">🎁 {t('wishHint')}</p>
-      <AddForm onAdd={add} onAddMany={addMany} products={[]} pending={[]} enabled={false} placeholder={t('wishPh')} />
+      <AddForm onAdd={add} onAddMany={addMany} products={[]} pending={[]} existing={items} enabled={false} placeholder={t('wishPh')} />
       {wishes.length === 0 ? (
         <p className="center muted pad">{t('wishEmpty')}</p>
       ) : (
@@ -92,8 +91,7 @@ function BuyerView({ list, user }) {
 
   if (!items) return <div className="center muted">{t('loading')}</div>
 
-  const nameOf = (email) => items.find((i) => i.for === email && i.forName && !i.idea)?.forName
-    || items.find((i) => i.for === email && i.forName)?.forName || email.split('@')[0]
+  const nameOf = (id) => recipientName(list, id, items)
   // O dorință scoasă de cel care o voia rămâne doar dacă cineva a rezervat-o sau a luat-o deja.
   const visible = items.filter((i) => !i.removed || i.status !== 'pending')
   const order = { pending: 0, reserved: 1, bought: 2 }
@@ -106,9 +104,9 @@ function BuyerView({ list, user }) {
   const editing = items.find((i) => i.id === editingId)
   const chatting = chat && items.find((i) => i.id === chat.id)
 
-  const add = ({ name, quantity = '' }) => {
+  const add = ({ name, quantity = '', link = '' }) => {
     if (!forEmail) return false
-    api.addItem(list.id, user, { name: name.trim(), quantity, forEmail, forName: nameOf(forEmail), idea: true }, { catalog: false })
+    api.addItem(list.id, user, { name: name.trim(), quantity, link, forEmail, forName: nameOf(forEmail), idea: true }, { catalog: false })
     return true
   }
   const addMany = (products) => {
@@ -136,7 +134,7 @@ function BuyerView({ list, user }) {
                 onClick={() => setForEmail(e)}>{nameOf(e)}</button>
             ))}
           </div>
-          <AddForm onAdd={add} onAddMany={addMany} products={[]} pending={[]} enabled={false}
+          <AddForm onAdd={add} onAddMany={addMany} products={[]} pending={[]} existing={items} enabled={false}
             placeholder={forEmail ? t('ideaPh', nameOf(forEmail)) : undefined} />
         </>
       )}
@@ -242,7 +240,7 @@ function WishEditSheet({ list, item, buyer, recipients, nameOf, onClose, onRemov
         <label>{t('wishLabel')}<input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></label>
         <label>{t('qtyLabel')}<input value={qty} onChange={(e) => setQty(e.target.value)} maxLength={20} placeholder={t('wishQtyEx')} /></label>
         <label>{t('note')}<input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={t('wishNoteEx')} /></label>
-        <label>{t('linkLabel')}<input type="url" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500}
+        <label>{t('linkLabel')}<input type="url" value={link} onChange={(e) => setLink(e.target.value)} maxLength={1000}
           placeholder="https://…" autoCapitalize="off" /></label>
         {badLink && <p className="error small">{t('linkInvalid')}</p>}
         {buyer && recipients.length > 1 && (

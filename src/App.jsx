@@ -7,6 +7,7 @@ import { isGiftList, receivesIn } from './gifts.js'
 import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet, useAnnounce } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell, IconChat, IconX } from './icons.jsx'
 import { ChatSheet, useListChat } from './Chat.jsx'
+import { ShareInSheet, sharedFromUrl } from './ShareIn.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
 import { InviteAppSheet, InstallSheet, InstallBanner, InAppWarning, Tips, PushPrompt, Welcome, LangPicker, showWelcome, tipsSeen } from './onboarding.jsx'
@@ -108,6 +109,7 @@ function listFromUrl() {
   return id
 }
 const START_LIST = listFromUrl()
+const START_SHARE = sharedFromUrl() // un link trimis din altă aplicație (Share pe Android)
 
 function Home({ user, admin }) {
   const toast = useToast()
@@ -122,6 +124,7 @@ function Home({ user, admin }) {
   }, [])
   const [tipsDone, setTipsDone] = useState(tipsSeen)
   const [sheet, setSheet] = useState(null) // 'menu' | 'share' | 'announce' | 'settings' | 'admin' | null
+  const [shared, setShared] = useState(START_SHARE)
 
   useEffect(() => startPrefsSync(user.uid, api), [user.uid])
   useEffect(() => { api.refreshPush(user) }, [user.uid])
@@ -240,6 +243,10 @@ function Home({ user, admin }) {
       {sheet === 'aisles' && current && <AislesSheet list={current} onClose={close} />}
       {sheet === 'invite-app' && <InviteAppSheet user={user} onClose={close} />}
       {sheet === 'install' && <InstallSheet onClose={close} />}
+      {shared && sorted.length > 0 && (
+        <ShareInSheet shared={shared} lists={sorted} current={current} user={user}
+          onDone={(id) => { setCurrentId(id); setShared(null) }} onClose={() => setShared(null)} />
+      )}
       {sheet === 'chat' && current && !iReceive && <ChatSheet list={current} user={user} scope="list" onClose={closeChat} />}
       {sheet === 'history' && current && <HistorySheet list={current} user={user} onClose={close} />}
     </div>

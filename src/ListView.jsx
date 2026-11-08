@@ -8,7 +8,8 @@ import { usePrefs } from './prefs.js'
 import { Sheet, firstName, store, useNow, useToast, errText } from './ui.jsx'
 import { ChatSheet } from './Chat.jsx'
 import { sendAnnounce, atShopText } from './sheets.jsx'
-import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic } from './icons.jsx'
+import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic, IconLink } from './icons.jsx'
+import { safeLink, findUrl, nameFromUrl, unknownName, linkHost } from './links.js'
 import { speechSupported, listen, speechErrText, parseProducts, hasSpokenAnd } from './voice.js'
 import { t } from './i18n.jsx'
 
@@ -56,16 +57,17 @@ export function ListView({ list, user }) {
 
   // Același produs cu aceeași cantitate e deja pe listă; cu altă cantitate sau marcă („Țigări · Kent”)
   // e alt produs. Un duplicat adevărat se poate adăuga totuși, din toast.
-  function add({ name, quantity = '' }, quiet = false, force = false) {
+  // `link`: produs venit dintr-un link (lipit în câmp); nu intră în sugestii.
+  function add({ name, quantity = '', link = '' }, quiet = false, force = false) {
     const n = name.trim()
     const dup = !force && pending.find((i) => sameProduct(i, { name: n, quantity }))
     if (dup) {
-      if (!quiet) toast(t('alreadyOnList', dup.name), () => add({ name: n, quantity }, true, true), t('addAnyway'))
+      if (!quiet) toast(t('alreadyOnList', dup.name), () => add({ name: n, quantity, link }, true, true), t('addAnyway'))
       return false
     }
     const known = productMap.get(productKey(n))
     const aisle = known?.aisle ? knownAisle(aisles, known.aisle, n) : guessAisle(n, aisles)
-    api.addItem(list.id, user, { name: n, quantity, aisle })
+    api.addItem(list.id, user, { name: n, quantity, aisle, link }, { catalog: !link })
     return true
   }
 
@@ -162,10 +164,12 @@ export function ListView({ list, user }) {
   )
 }
 
-export function AddForm({ onAdd, onAddMany, products, pending, enabled, placeholder }) {
+// `existing`: produsele de pe listă, pentru numerotarea „Produs necunoscut N” (implicit cele de cumpărat).
+export function AddForm({ onAdd, onAddMany, products, pending, enabled, placeholder, existing }) {
   const toast = useToast()
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
+  const [link, setLink] = useState(null) // link lipit: numele se ghicește din el, link-ul rămâne la produs
   const [listening, setListening] = useState(false)
   const [preview, setPreview] = useState(null) // produsele înțelese, de confirmat înainte de adăugare
   const ref = useRef()
@@ -210,8 +214,28 @@ export function AddForm({ onAdd, onAddMany, products, pending, enabled, placehol
     else toast(t('noneFound'))
   }
 
+  // Un link lipit în câmpul de produs: numele se ghicește din adresă, link-ul se ține deoparte.
+  function paste(e) {
+    const text = e.clipboardData?.getData('text') || ''
+    const url = findUrl(text)
+    if (!url) return
+    e.preventDefault()
+    setLink(url)
+    setName((n) => n.trim() || nameFromUrl(url) || '')
+  }
+
+  function reset() { setName(''); setQty(''); setLink(null) }
+
   function submit(e) {
     e.preventDefault()
+    // Link lipit sau scris de mână în câmpul de produs.
+    const url = link || findUrl(name)
+    if (url) {
+      const n = name.replace(url, '').trim() || nameFromUrl(url) || unknownName(existing || pending)
+      if (onAdd({ name: n, quantity: qty.trim(), link: url })) reset()
+      ref.current?.focus()
+      return
+    }
     if (!name.trim()) return
     // Cu virgule și fără cantitate separată: sunt mai multe produse („lapte, ouă, două pâini”).
     // Unde vocea merge prin tastatură, despărțim și după „și” (dictarea pune rar virgule).
@@ -230,19 +254,26 @@ export function AddForm({ onAdd, onAddMany, products, pending, enabled, placehol
   return (
     <div className="add-wrap">
       <form className="add" onSubmit={submit}>
-        <input ref={ref} className="add-name" value={name} onChange={(e) => setName(e.target.value)}
-          placeholder={listening ? t('listening') : placeholder || t('addPh')} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label={t('productLabel')} />
+        <input ref={ref} className="add-name" value={name} onChange={(e) => setName(e.target.value)} onPaste={paste}
+          placeholder={listening ? t('listening') : link ? t('linkNamePh') : placeholder || t('addPh')} maxLength={120} enterKeyHint="done" autoComplete="off" aria-label={t('productLabel')} />
         <input className="add-qty" value={qty} onChange={(e) => setQty(e.target.value)}
           placeholder={t('qtyPh')} maxLength={20} enterKeyHint="done" autoComplete="off" aria-label={t('qtyLabel')} />
-        {speechSupported() && (listening || !name.trim()) ? (
+        {speechSupported() && (listening || (!name.trim() && !link)) ? (
           <button type="button" className={`add-btn mic ${listening ? 'listening' : ''}`} onClick={voice}
             aria-label={listening ? t('stopListening') : t('speakItems')}>
             <IconMic />
           </button>
         ) : (
-          <button className="add-btn" disabled={!name.trim()} aria-label={t('add')}><IconPlus /></button>
+          <button className="add-btn" disabled={!name.trim() && !link} aria-label={t('add')}><IconPlus /></button>
         )}
       </form>
+      {link && (
+        <div className="link-chip">
+          <IconLink /> <span className="grow">{linkHost(link)}</span>
+          <span className="muted small">{name.trim() ? t('linkAttached') : t('linkNoName')}</span>
+          <button type="button" className="icon-btn sm" onClick={() => setLink(null)} aria-label={t('dropLink')}><IconX /></button>
+        </div>
+      )}
       {suggestions.length > 0 && (
         <div className="suggestions" aria-label={t('historySuggestions')}>
           {suggestions.map((p) => (
@@ -331,6 +362,9 @@ function ItemRow({ item, now, unread, onCheck, onSkip, onEdit, onChat }) {
         {item.note && <span className="item-note">{item.note}</span>}
         <span className="item-meta">{meta}</span>
       </button>
+      {safeLink(item.link) && (
+        <a className="chat-btn" href={item.link} target="_blank" rel="noopener noreferrer" aria-label={t('openLink', item.name)}><IconLink /></a>
+      )}
       {(!isDone || item.msgCount > 0) && (
         <button className={`chat-btn ${item.msgCount ? 'has' : ''}`} onClick={onChat}
           aria-label={t('chatAbout', item.name, item.msgCount, unread)}>
@@ -365,12 +399,14 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
   const [name, setName] = useState(item.name)
   const [qty, setQty] = useState(item.quantity || '')
   const [note, setNote] = useState(item.note || '')
+  const [link, setLink] = useState(item.link || '')
   const [aisle, setAisle] = useState(itemAisle(item, aisles))
+  const badLink = link.trim() && !safeLink(link.trim())
 
   function save(e) {
     e.preventDefault()
-    if (!name.trim()) return
-    api.updateItem(list.id, item.id, { name: name.trim(), quantity: qty.trim(), note: note.trim() })
+    if (!name.trim() || badLink) return
+    api.updateItem(list.id, item.id, { name: name.trim(), quantity: qty.trim(), note: note.trim(), link: link.trim() })
     // Raionul ales de mână se ține minte în catalog, pentru data viitoare.
     if (aisle !== item.aisle) api.setItemAisle(list.id, { ...item, name: name.trim() }, aisle)
     onClose()
@@ -393,6 +429,9 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
           </label>
         </div>
         <label>{t('note')}<input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={t('noteEx')} /></label>
+        <label>{t('linkLabel')}<input type="url" value={link} onChange={(e) => setLink(e.target.value)} maxLength={1000}
+          placeholder="https://…" autoCapitalize="off" /></label>
+        {badLink && <p className="error small">{t('linkInvalid')}</p>}
         <button type="button" className="btn wide-left" onClick={onChat}>
           <IconChat /> {item.msgCount ? t('chatWithCount', item.msgCount) : t('askAbout')}
         </button>
@@ -402,7 +441,7 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
         </p>
         <div className="row">
           <button type="button" className="btn danger" onClick={remove}>{t('delete')}</button>
-          <button className="btn primary grow" disabled={!name.trim()}>{t('save')}</button>
+          <button className="btn primary grow" disabled={!name.trim() || badLink}>{t('save')}</button>
         </div>
       </form>
     </Sheet>

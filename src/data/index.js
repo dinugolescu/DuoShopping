@@ -8,10 +8,11 @@ export const DEMO_USERS = backend.DEMO_USERS ?? []
 export const {
   onUser, signIn, signOut, watchAccess, setWriteErrorHandler,
   watchLists, createList, renameList, setListAisles, deleteList, adminDeleteList, invite, inviteToApp, removeMember, leaveList, setReceives,
+  addNamedRecipient, setRecipientName, removeNamedRecipient,
   watchItems, watchWishes, addItem, updateItem, setItemAisle, deleteItem, setStatus, finishTrip,
   watchSecret, setGiftStatus,
   watchProducts, watchHistory,
-  watchMessages, watchListChat, sendMessage, toggleReaction, deleteMessage,
+  watchMessages, watchListChat, sendMessage, toggleReaction, deleteMessage, deleteMessagePhoto,
   watchAllLists, watchAllowed, revokeAccess,
   loadUserPrefs, saveUserPrefs,
   watchAnnounced, saveAnnounced,

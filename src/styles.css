@@ -510,6 +510,12 @@ a.btn.primary { color: var(--accent-text); }
   border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent);
 }
 .announce-bar { margin-bottom: 6px; }
+/* Link lipit în câmpul de adăugare / venit din Share */
+.link-chip {
+  display: flex; align-items: center; gap: 8px; margin: 6px 0 0; padding: 4px 4px 4px 12px;
+  border-radius: 12px; background: var(--accent-soft); font-size: 14px;
+}
+.link-chip svg { width: 16px; height: 16px; flex: none; }
 .announce-bar .hint-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .announce-from { font-size: 13px; font-weight: 700; color: var(--accent); }
 .announce-text {

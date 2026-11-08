@@ -6,7 +6,7 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, where, orderBy, limit, limitToLast,
-  serverTimestamp, arrayUnion, arrayRemove, increment, writeBatch, FieldPath,
+  serverTimestamp, arrayUnion, arrayRemove, increment, writeBatch, FieldPath, deleteField,
 } from 'firebase/firestore'
 import { normEmail, who, newItemFields, finishTripChanges } from './shared.js'
 import { productKey } from '../aisles.js'
@@ -210,6 +210,21 @@ export function setReceives(listId, email, receives) {
   fire(updateDoc(listDoc(listId), { recipients: receives ? arrayUnion(normEmail(email)) : arrayRemove(normEmail(email)) }))
 }
 
+// Lista de cadouri: cineva care primește cadouri doar cu numele (fără cont) și numele afișate (doar creatorul).
+export function addNamedRecipient(listId, name) {
+  const id = `name:${Math.random().toString(36).slice(2, 10)}`
+  fire(updateDoc(listDoc(listId), new FieldPath('recipientNames', id), name.trim(), 'recipients', arrayUnion(id)))
+  return id
+}
+
+export function setRecipientName(listId, id, name) {
+  fire(updateDoc(listDoc(listId), new FieldPath('recipientNames', id), name.trim() || deleteField()))
+}
+
+export function removeNamedRecipient(listId, id) {
+  fire(updateDoc(listDoc(listId), 'recipients', arrayRemove(id), new FieldPath('recipientNames', id), deleteField()))
+}
+
 // ---------- Produse ----------
 
 export function watchItems(listId, cb, onError) {
@@ -361,6 +376,11 @@ export function toggleReaction(listId, itemId, msgId, reactionId, uid, on, scope
     new FieldPath('reactions', reactionId),
     on ? arrayUnion(uid) : arrayRemove(uid),
   ))
+}
+
+// Șterge doar poza dintr-un mesaj; textul rămâne (cu „Poză ștearsă”).
+export function deleteMessagePhoto(listId, itemId, msgId, scope) {
+  fire(updateDoc(doc(msgsCol(listId, itemId, scope), msgId), { photo: null, photoDeleted: true }))
 }
 
 export function deleteMessage(listId, itemId, msgId, scope) {

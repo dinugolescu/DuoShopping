@@ -40,6 +40,11 @@ service cloud.firestore {
     function receives(list) {
       return isGift(list) && myEmail() in list.get('recipients', []);
     }
+    // Actualizarea unui mesaj care doar îi scoate poza (textul rămâne).
+    function photoRemoved() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo', 'photoDeleted'])
+        && request.resource.data.photo == null && request.resource.data.photoDeleted == true;
+    }
     // Pe o listă obișnuită toți membrii „cumpără”.
     function isBuyer(list) {
       return isMember(list) && !receives(list);
@@ -91,7 +96,8 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/lists/$(listId)).data;
       }
       function validList(l) {
-        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients'])
+        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients', 'recipientNames'])
+          && (!('recipientNames' in l) || (l.recipientNames is map && l.recipientNames.size() <= 40))
           && (!('kind' in l) || l.kind == 'gifts')
           && (!('recipients' in l) || (l.recipients is list && l.recipients.size() <= 30))
           && (!('aisles' in l) || (l.aisles is list && l.aisles.size() <= 40))
@@ -114,6 +120,10 @@ service cloud.firestore {
               || after.get('recipients', []).hasAll(before.get('recipients', []))
               || !after.memberEmails.hasAny(before.get('recipients', []).removeAll(after.get('recipients', []))));
       }
+      // Numele celor care primesc cadouri (și cei adăugați doar cu numele, fără cont) le schimbă doar creatorul.
+      function namesOk(before, after) {
+        return after.get('recipientNames', {}) == before.get('recipientNames', {}) || isOwner(before) || isAdmin();
+      }
       // Cine primește cadouri nu schimbă nimic la listă, în afară de numărul de produse și ieșirea din ea.
       function receiverChangeOk(before, after) {
         return !receives(before)
@@ -135,6 +145,7 @@ service cloud.firestore {
         && request.resource.data.ownerEmail == resource.data.ownerEmail
         && membersOk(resource.data, request.resource.data)
         && rolesOk(resource.data, request.resource.data)
+        && namesOk(resource.data, request.resource.data)
         && receiverChangeOk(resource.data, request.resource.data);
 
       allow delete: if isOwner(resource.data) || isAdmin();
@@ -149,7 +160,7 @@ service cloud.firestore {
       // primește cadouri n-o vede (anunțurile vorbesc despre ce s-a luat).
       match /chat/{msgId} {
         allow read: if isBuyer(list());
-        allow delete: if isBuyer(list()) && resource.data.by.uid == request.auth.uid;
+        allow delete: if isBuyer(list()) && (resource.data.by.uid == request.auth.uid || isOwner(list()));
         allow create: if isBuyer(list())
           && request.resource.data.keys().hasOnly(['text', 'photo', 'by', 'at', 'reactions'])
           && request.resource.data.by.uid == request.auth.uid
@@ -157,7 +168,8 @@ service cloud.firestore {
           && (request.resource.data.photo == null
               || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
         allow update: if isBuyer(list())
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+              || (photoRemoved() && (resource.data.by.uid == request.auth.uid || isOwner(list()))));
       }
 
       // Partea ascunsă a unei dorințe: rezervarea, cumpărarea și discuția celor care cumpără.
@@ -173,7 +185,7 @@ service cloud.firestore {
             && (request.resource.data.photo == null
                 || (request.resource.data.photo is string && request.resource.data.photo.size() < 900000));
           allow update: if isGift(list()) && isBuyer(list())
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+            && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']) || photoRemoved());
         }
       }
 
@@ -217,9 +229,7 @@ service cloud.firestore {
           // Reacțiile: oricine din listă le poate modifica. În rest, se poate doar șterge poza
           // (la „Golește rezolvatele”, pentru produsele arhivate); textul rămâne neatins.
           allow update: if canSee()
-            && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
-                || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo', 'photoDeleted'])
-                    && request.resource.data.photo == null && request.resource.data.photoDeleted == true));
+            && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']) || photoRemoved());
         }
       }
     }

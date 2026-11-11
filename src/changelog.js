@@ -4,6 +4,11 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.4.1', date: '2026-11-11',
+    ro: ['Pe iPhone, în Chrome sau în browserul din WhatsApp/Facebook, butonul de microfon te trimite la dictarea de pe tastatură (microfonul aplicației merge acolo doar din Safari).'],
+    en: ['On iPhone, in Chrome or in the WhatsApp/Facebook browser, the microphone button sends you to keyboard dictation (the app’s microphone only works from Safari there).'],
+  },
+  {
     v: '2.4', date: '2026-11-08',
     ro: [
       'Mesajele și pozele din discuții le poate șterge cine le-a scris sau creatorul listei. Poza se poate șterge și singură, textul rămâne.',

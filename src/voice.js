@@ -9,6 +9,16 @@ import { t, speechLang } from './i18n.jsx'
 const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
 export const speechSupported = () => !!SR
 
+// Pe iPhone, microfonul paginii merge doar în Safari și în aplicația instalată din Safari. În Chrome,
+// Firefox sau în browserul din WhatsApp/Facebook etc., iOS răspunde cu un mesaj al lui („does not
+// support mic”); acolo folosim direct dictarea de pe tastatură, care merge oriunde.
+const UA = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+const IOS = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1)
+const IOS_STANDALONE = typeof navigator !== 'undefined' && navigator.standalone === true
+const IOS_SAFARI = /Safari\//.test(UA)
+  && !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|YaBrowser|Brave|FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Messenger|Line\/|Snapchat|TikTok|musical_ly/i.test(UA)
+export const appMicWorks = () => !IOS || IOS_STANDALONE || IOS_SAFARI
+
 const SILENCE_MS = 1800 // după atâta liniște considerăm că omul a terminat de spus
 const NOTHING_MS = 7000 // dacă nu vine nimic în atât timp, recunoașterea nu merge (se întâmplă pe iPhone)
 

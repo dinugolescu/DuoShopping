@@ -2,6 +2,8 @@ import { POSTPONED } from '../config.js'
 import { t } from '../i18n.jsx'
 
 export const normEmail = (e) => String(e || '').trim().toLowerCase()
+// Două puncte la rând nu există în nicio adresă; scapă ușor la tastat și invitația ajunge la nimeni.
+export const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && !e.includes('..')
 export const who = (user) => ({ uid: user.uid, name: user.name })
 
 // Reacțiile la mesaje: ID-uri simple ca nume de câmp, emoji doar pentru afișare.
@@ -16,8 +18,11 @@ export const REACTIONS = [
 
 // Pe lista de cadouri: `forEmail`/`forName` = pentru cine e dorința; `idea` = adăugată de cineva care
 // cumpără (cel care primește n-o vede).
-export function newItemFields(user, { name, quantity = '', note = '', aisle = null, link = '', forEmail = null, forName = '', idea = false }) {
+// `shop`: id-ul magazinului de pe listă; `urgent`: produsul apare primul și e scos în evidență în anunț.
+export function newItemFields(user, { name, quantity = '', note = '', aisle = null, link = '', forEmail = null, forName = '', idea = false, shop = null, urgent = false }) {
   return {
+    ...(shop ? { shop } : {}),
+    ...(urgent ? { urgent: true } : {}),
     ...(forEmail ? { for: forEmail, forName } : {}),
     ...(idea ? { idea: true } : {}),
     link: link.trim(),
@@ -89,8 +94,10 @@ export function markAnnounced(state, pending, keys) {
 
 // Textul anunțului din evenimentele alese. E scris în limba celui care trimite.
 const count = (n) => t('sumProducts', n)
+// Cele urgente vin primele, ca să nu rămână pe dinafară când lista e lungă.
 function names(list) {
-  const shown = list.slice(0, 4).map((i) => i.name).join(', ')
+  const sorted = [...list].sort((a, b) => !!b.urgent - !!a.urgent)
+  const shown = sorted.slice(0, 4).map((i) => (i.urgent && i.status === 'pending' ? t('sumUrgent', i.name) : i.name)).join(', ')
   return t('sumNames', shown, Math.max(0, list.length - 4))
 }
 export function eventsSummary(events, user) {

@@ -7,6 +7,7 @@ import { usePrefs, setPref } from './prefs.js'
 import { ICON_DESIGNS, ICON_COLORS, iconDataUrl } from './appIcons.js'
 import { speechSupported } from './voice.js'
 import { t, lang, LANGS } from './i18n.jsx'
+import { validEmail } from './data/shared.js'
 
 // Adresa pe care o trimitem în invitații (VITE_APP_URL, altfel adresa curentă).
 export const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin
@@ -75,7 +76,6 @@ export async function shareText(text, toast) {
   }
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function InviteAppSheet({ user, onClose }) {
   const toast = useToast()
@@ -85,7 +85,7 @@ export function InviteAppSheet({ user, onClose }) {
   function submit(e) {
     e.preventDefault()
     const v = email.trim().toLowerCase()
-    if (!EMAIL_RE.test(v)) { toast(t('invalidEmail')); return }
+    if (!validEmail(v)) { toast(t('invalidEmail')); return }
     if (v === user.email) { toast(t('ownEmail')); return }
     api.inviteToApp(user, v)
     setInvited(v)

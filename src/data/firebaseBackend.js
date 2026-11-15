@@ -171,6 +171,14 @@ export function setListAisles(listId, aisles) {
   fire(updateDoc(listDoc(listId), { aisles }))
 }
 
+export function setListShops(listId, shops) {
+  fire(updateDoc(listDoc(listId), { shops }))
+}
+
+export function setListSets(listId, sets) {
+  fire(updateDoc(listDoc(listId), { sets }))
+}
+
 // Ștergerea unei liste o face serverul (funcția `adminDeleteList`): pe o listă de cadouri, cine primește
 // cadouri nu poate citi tot conținutul, iar adminul nu vede conținutul listelor altora, deci din telefon
 // ștergerea ar fi refuzată. Serverul verifică să fie creatorul listei sau adminul.
@@ -249,6 +257,7 @@ export function addItem(listId, user, fields, { catalog = true } = {}) {
   // Catalogul listei: de aici vin sugestiile și raionul ținut minte.
   if (catalog) b.set(doc(productsCol(listId), productKey(item.name)), {
     name: item.name, quantity: item.quantity, aisle: item.aisle, count: increment(1), lastAt: serverTimestamp(),
+    ...(item.shop ? { shop: item.shop } : {}),
   }, { merge: true })
   fire(b.commit())
   return ref.id
@@ -262,6 +271,14 @@ export function setItemAisle(listId, item, aisle) {
   const b = writeBatch(db)
   b.update(itemDoc(listId, item.id), { aisle })
   b.set(doc(productsCol(listId), productKey(item.name)), { name: item.name, aisle }, { merge: true })
+  fire(b.commit())
+}
+
+// Magazinul ales de mână se ține minte în catalog, ca raionul. `shop` null = de oriunde.
+export function setItemShop(listId, item, shop) {
+  const b = writeBatch(db)
+  b.update(itemDoc(listId, item.id), { shop })
+  b.set(doc(productsCol(listId), productKey(item.name)), { name: item.name, shop }, { merge: true })
   fire(b.commit())
 }
 

@@ -4,7 +4,7 @@ import { ToastHost, useToast, errText, store, firstName } from './ui.jsx'
 import { ListView } from './ListView.jsx'
 import { GiftListView } from './GiftList.jsx'
 import { isGiftList, receivesIn } from './gifts.js'
-import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, HistorySheet, useAnnounce } from './sheets.jsx'
+import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, ShopsSheet, SetsSheet, HistorySheet, useAnnounce } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell, IconChat, IconX } from './icons.jsx'
 import { ChatSheet, useListChat } from './Chat.jsx'
 import { ShareInSheet, sharedFromUrl } from './ShareIn.jsx'
@@ -235,12 +235,14 @@ function Home({ user, admin }) {
           onClose={close}
         />
       )}
-      {sheet === 'share' && current && <ShareSheet list={current} user={user} admin={admin} onClose={close} />}
-      {sheet === 'share-new' && current?.id === currentId && <ShareSheet list={current} user={user} admin={admin} fresh onClose={close} />}
+      {sheet === 'share' && current && <ShareSheet list={current} lists={sorted} user={user} admin={admin} onClose={close} />}
+      {sheet === 'share-new' && current?.id === currentId && <ShareSheet list={current} lists={sorted} user={user} admin={admin} fresh onClose={close} />}
       {sheet === 'settings' && <SettingsSheet user={user} onClose={close} />}
       {sheet === 'announce' && current && <AnnounceSheet list={current} user={user} pending={ann.pending} mark={ann.mark} onClose={close} />}
       {sheet === 'admin' && admin && <AdminSheet user={user} onClose={close} />}
       {sheet === 'aisles' && current && <AislesSheet list={current} onClose={close} />}
+      {sheet === 'shops' && current && <ShopsSheet list={current} onClose={close} />}
+      {sheet === 'sets' && current && <SetsSheet list={current} user={user} onClose={close} />}
       {sheet === 'invite-app' && <InviteAppSheet user={user} onClose={close} />}
       {sheet === 'install' && <InstallSheet onClose={close} />}
       {shared && sorted.length > 0 && (

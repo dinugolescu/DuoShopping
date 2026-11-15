@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as api from './data/index.js'
 import { THEMES, FONTS, usePrefs, setPref } from './prefs.js'
 import { relTime } from './time.js'
 import { Sheet, Switch, firstName, useToast, errText, announceErrText, store } from './ui.jsx'
-import { myEvents, markAnnounced, eventsSummary, FIRST_CUTOFF } from './data/shared.js'
+import { myEvents, markAnnounced, eventsSummary, FIRST_CUTOFF, validEmail } from './data/shared.js'
 import { IconUp, IconChevron } from './icons.jsx'
 import { AISLES, DEFAULT_AISLE, LEGACY, listAisles, guessAisle, knownAisle, normalize, aisleLabel, canonicalAisleLabel } from './aisles.js'
 import { reasonLabel } from './config.js'
@@ -11,6 +11,8 @@ import { InviteShare, isInstalled, IconPicker, LangPicker } from './onboarding.j
 import { t, locale } from './i18n.jsx'
 import { CHANGELOG, VERSION, changes } from './changelog.js'
 import { isGiftList, receivesIn, watchGiftItems, recipientName, isNamedRecipient } from './gifts.js'
+import { listShops, listSets, shopIn, newShopId, newSetId, setText, MAX_SHOPS, MAX_SETS, MAX_SET_ITEMS } from './shops.js'
+import { parseProducts } from './voice.js'
 
 const people = (n) => t('people', n)
 const products = (n) => t('products', n)
@@ -72,6 +74,8 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
             <button className="btn" disabled={!rename.trim() || rename.trim() === current.name}>{t('rename')}</button>
           </form>
           {!giftList && <button className="btn wide" onClick={() => onOpen('aisles')}>{t('listAisles')}</button>}
+          {!giftList && <button className="btn wide" onClick={() => onOpen('shops')}>{t('listShops')}</button>}
+          {!giftList && <button className="btn wide" onClick={() => onOpen('sets')}>{t('listSets')}</button>}
           {!giftList && <button className="btn wide" onClick={() => onOpen('history')}>{t('shoppingHistory')}</button>}
           {canDelete && <button className="btn danger wide" onClick={del}>{t('deleteList')}</button>}
         </>
@@ -100,7 +104,7 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
 
 // ---------- Cine vede lista ----------
 
-export function ShareSheet({ list, user, admin, fresh, onClose }) {
+export function ShareSheet({ list, lists = [], user, admin, fresh, onClose }) {
   const toast = useToast()
   const [email, setEmail] = useState('')
   const [invited, setInvited] = useState(null)
@@ -111,10 +115,22 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
   const iReceive = receivesIn(list, user)
   const recipients = list.recipients || []
 
+  // Adresele cunoscute: oamenii din celelalte liste ale tale. Cele mai des întâlnite vin primele.
+  // Alese dintr-o atingere, nu mai pot fi tastate greșit.
+  const known = useMemo(() => {
+    const seen = new Map()
+    for (const l of lists) for (const m of l.memberEmails || []) seen.set(m, (seen.get(m) || 0) + 1)
+    const q = email.trim().toLowerCase()
+    return [...seen.keys()]
+      .filter((m) => m !== user.email && !list.memberEmails.includes(m) && m !== q && m.includes(q))
+      .sort((a, b) => seen.get(b) - seen.get(a) || a.localeCompare(b))
+      .slice(0, 6)
+  }, [lists, list.memberEmails, user.email, email])
+
   function submit(e) {
     e.preventDefault()
     const v = email.trim().toLowerCase()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast(t('invalidEmail')); return }
+    if (!validEmail(v)) { toast(t('invalidEmail')); return }
     if (list.memberEmails.includes(v)) { toast(t('alreadyMember')); return }
     api.invite(list, user, v, gift && receives)
     setEmail('')
@@ -170,6 +186,13 @@ export function ShareSheet({ list, user, admin, fresh, onClose }) {
               autoComplete="off" autoCapitalize="off" aria-label={t('inviteEmailLabel')} />
             <button className="btn primary" disabled={!email.trim()}>{t('invite')}</button>
           </form>
+          {known.length > 0 && (
+            <div className="suggestions known" aria-label={t('knownEmails')}>
+              {known.map((m) => (
+                <button key={m} type="button" className="chip" onClick={() => setEmail(m)}>{m}</button>
+              ))}
+            </div>
+          )}
           <p className="muted small">
             {gift ? t('giftShareHint') : t('shareHint')}
             {!canRemove && t('onlyOwnerRemoves')}
@@ -529,7 +552,7 @@ export function AnnounceSheet({ list, user, pending, mark, onClose }) {
   )
 }
 
-export const atShopText = (user) => t('atShopText', firstName(user.name))
+export const atShopText = (user, shop) => (shop ? t('atShopNamed', firstName(user.name), shop.name) : t('atShopText', firstName(user.name)))
 
 // Trimite un anunț și arată rezultatul. Întoarce { ok } sau { ok: false, error } (mesaj clar că n-a plecat).
 export async function sendAnnounce(listId, text, toast) {
@@ -645,6 +668,159 @@ export function AislesSheet({ list, onClose }) {
     </Sheet>
   )
 }
+// ---------- Magazinele listei ----------
+// Un produs poate avea un magazin (ales din fereastra produsului și ținut minte pentru data viitoare).
+// Deasupra listei alegi magazinul în care ești și vezi doar ce se ia de acolo, plus ce se ia de oriunde.
+
+export function ShopsSheet({ list, onClose }) {
+  const toast = useToast()
+  const [rows, setRows] = useState(() => listShops(list).map((s) => ({ ...s })))
+  const [name, setName] = useState('')
+
+  const edit = (i, v) => setRows((r) => r.map((s, j) => (j === i ? { ...s, name: v } : s)))
+  function move(i, dir) {
+    const j = i + dir
+    if (j < 0 || j >= rows.length) return
+    setRows((r) => { const n = [...r]; [n[i], n[j]] = [n[j], n[i]]; return n })
+  }
+  function remove(i) {
+    if (!window.confirm(t('shopDeleteConfirm', rows[i].name))) return
+    setRows((r) => r.filter((_, j) => j !== i))
+  }
+  function add(e) {
+    e.preventDefault()
+    const n = name.trim()
+    if (!n) return
+    if (rows.some((s) => normalize(s.name) === normalize(n))) { toast(t('shopExists', n)); return }
+    setRows((r) => [...r, { id: newShopId(), name: n }])
+    setName('')
+  }
+  function save() {
+    // Un nume scris și neadăugat încă se salvează și el.
+    const extra = name.trim() && !rows.some((s) => normalize(s.name) === normalize(name)) ? [{ id: newShopId(), name: name.trim() }] : []
+    const all = [...rows, ...extra]
+    if (all.some((s) => !s.name.trim())) { toast(t('shopNeedsName')); return }
+    api.setListShops(list.id, all.slice(0, MAX_SHOPS).map((s) => ({ id: s.id, name: s.name.trim().slice(0, 30) })))
+    toast(t('shopsSaved'))
+    onClose()
+  }
+
+  return (
+    <Sheet title={t('shopsTitle', list.name)} onClose={onClose}>
+      <p className="muted small">{t('shopsHint')}</p>
+      <ul className="aisle-edit">
+        {rows.map((s, i) => (
+          <li key={s.id}>
+            <div className="row tight">
+              <input className="grow" value={s.name} onChange={(e) => edit(i, e.target.value)} aria-label={t('shopName')} maxLength={30} />
+              <div className="order-btns">
+                <button type="button" className="icon-btn sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label={t('moveUp', s.name)}><IconUp /></button>
+                <button type="button" className="icon-btn sm" disabled={i === rows.length - 1} onClick={() => move(i, 1)} aria-label={t('moveDown', s.name)}><IconChevron /></button>
+              </div>
+              <button type="button" className="btn small danger" onClick={() => remove(i)}>{t('delete')}</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {rows.length < MAX_SHOPS && (
+        <form className="row" onSubmit={add}>
+          <input className="grow" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('shopNewPh')} maxLength={30} />
+          <button className="btn" disabled={!name.trim()}>{t('add')}</button>
+        </form>
+      )}
+      <button type="button" className="btn primary wide" onClick={save}>{t('save')}</button>
+    </Sheet>
+  )
+}
+
+// ---------- Seturi de produse ----------
+// Un set e o listă scurtă de produse cu nume („Grătar”, „Mic dejun”), pusă pe listă dintr-o atingere.
+// Apare și ca sugestie când îi scrii numele în câmpul de adăugare.
+
+export function SetsSheet({ list, user, onClose }) {
+  const toast = useToast()
+  const sets = listSets(list)
+  const [draft, setDraft] = useState(null) // { id (null = set nou), name, text }
+  const [pending, setPending] = useState([])
+  const [products, setProducts] = useState([])
+  useEffect(() => api.watchItems(list.id, (items) => setPending(items.filter((i) => i.status === 'pending')), () => {}), [list.id])
+  useEffect(() => api.watchProducts(list.id, setProducts), [list.id])
+
+  const aisles = listAisles(list)
+  const shops = listShops(list)
+  const key = (p) => `${normalize(p.name)}|${normalize(p.quantity || '')}`
+
+  function addToList(set) {
+    const onList = new Set(pending.map(key))
+    const fresh = set.items.filter((p) => !onList.has(key(p)))
+    for (const p of fresh) {
+      const known = products.find((k) => normalize(k.name) === normalize(p.name))
+      const aisle = known?.aisle ? knownAisle(aisles, known.aisle, p.name) : guessAisle(p.name, aisles)
+      api.addItem(list.id, user, { name: p.name, quantity: p.quantity || '', aisle, shop: shopIn(shops, known?.shop)?.id || null })
+    }
+    toast(fresh.length ? t('addedMany', fresh.map((p) => p.name).join(', ')) : t('setAllOnList', set.name))
+    if (fresh.length) onClose()
+  }
+  function remove(set) {
+    if (!window.confirm(t('setDeleteConfirm', set.name))) return
+    api.setListSets(list.id, sets.filter((s) => s.id !== set.id))
+  }
+  function save(e) {
+    e.preventDefault()
+    const items = parseProducts(draft.text).slice(0, MAX_SET_ITEMS)
+    if (!draft.name.trim() || !items.length) { toast(t('setNeedsBoth')); return }
+    const set = { id: draft.id || newSetId(), name: draft.name.trim().slice(0, 40), items }
+    api.setListSets(list.id, draft.id ? sets.map((s) => (s.id === draft.id ? set : s)) : [...sets, set])
+    setDraft(null)
+  }
+
+  if (draft) {
+    return (
+      <Sheet title={draft.id ? t('setEditTitle') : t('setNewTitle')} onClose={() => setDraft(null)}>
+        <form className="stack" onSubmit={save}>
+          <label>{t('setName')}<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} maxLength={40} placeholder={t('setNamePh')} /></label>
+          <label>{t('setItems')}
+            <textarea rows={7} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} placeholder={t('setItemsPh')} />
+          </label>
+          {pending.length > 0 && (
+            <button type="button" className="btn wide-left" onClick={() => setDraft({ ...draft, text: setText(pending) })}>
+              {t('setFromList', pending.length)}
+            </button>
+          )}
+          <div className="row">
+            <button type="button" className="btn" onClick={() => setDraft(null)}>{t('previewCancel')}</button>
+            <button className="btn primary grow" disabled={!draft.name.trim() || !draft.text.trim()}>{t('save')}</button>
+          </div>
+        </form>
+      </Sheet>
+    )
+  }
+
+  return (
+    <Sheet title={t('setsTitle', list.name)} onClose={onClose}>
+      <p className="muted small">{t('setsHint')}</p>
+      <ul className="members">
+        {sets.map((s) => (
+          <li key={s.id} className="set-row">
+            <span className="grow">
+              🧺 <b>{s.name}</b>
+              <span className="muted small block">{s.items.map((p) => `${p.quantity ? `${p.quantity} ` : ''}${p.name}`).join(', ')}</span>
+            </span>
+            <span className="set-btns">
+              <button className="btn small primary" onClick={() => addToList(s)}>{t('setAdd')}</button>
+              <button className="btn small" onClick={() => setDraft({ id: s.id, name: s.name, text: setText(s.items) })}>{t('setEdit')}</button>
+              <button className="btn small danger" onClick={() => remove(s)}>{t('delete')}</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {sets.length < MAX_SETS && (
+        <button className="btn wide" onClick={() => setDraft({ id: null, name: '', text: '' })}>{t('setNew')}</button>
+      )}
+    </Sheet>
+  )
+}
+
 // ---------- Istoric cumpărături ----------
 
 const dayLabel = (ms) => {

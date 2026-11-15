@@ -7,8 +7,8 @@
 //    („suc de roșii” → Băcănie, pentru că „suc” vine primul).
 //    Un cuvânt se potrivește exact cu cheile cu „=” (ex. „=mar”) sau începe cu o rădăcină
 //    („rosi” prinde „rosii”, „rosie”). Dintre rădăcini câștigă cea mai lungă.
-// 3. Pluralele care schimbă ultima literă („paini” față de „paine”) se prind la final, dacă nimic
-//    altceva nu s-a potrivit.
+// 3. Formele articulate („merele”), pluralul cu „oa” („șampoane”) și pluralele care schimbă ultima
+//    literă („paini” față de „paine”) se prind la final, dacă nimic altceva nu s-a potrivit.
 // Când corectezi raionul unui produs, aplicația ține minte alegerea ta pentru lista respectivă
 // și nu mai ghicește pentru el.
 // Dicționarul are cuvinte în română și în engleză (WORDS_EN), ca ghicitul să meargă în ambele limbi.
@@ -76,7 +76,9 @@ const WORDS = {
   legume: [
     'rosi', 'castrave', 'ardei', 'ceap', '=cepe', 'usturo', 'cartof', 'morcov', 'varz', 'salat', 'spanac',
     'patrunjel', 'marar', 'leustean', 'telin', 'dovle', 'vinet', 'ciuperc', 'broccoli', 'conopid',
-    'praz', 'ridich', 'sfecl', 'ghimbir', 'legum', 'fruct', 'verdetur', 'rucola', 'ceapa',
+    'praz', 'ridich', 'sfecl', 'ghimbir', 'legum', 'fruct', 'verdetur', 'rucola', 'ceapa', 'verze',
+    'gogosar', 'pastarnac', 'porumb', 'guli', 'andiv', 'patlagel', 'hrean', 'leurd', 'urzic', 'stevi', 'lobod',
+    '=bame', 'zarzavat',
     '=mar', '=mere', '=pere', '=para', 'banan', 'portocal', 'mandarin', 'lamai', '=lime',
     'grepfrut', 'strugur', 'capsun', 'cires', 'visin', 'caise', 'piersic', 'prun', 'pepen', 'kiwi',
     'avocado', 'ananas', 'mango', 'rodi', 'afin', 'zmeur', '=mure', 'smochin', 'curmal', 'nectarin',
@@ -84,15 +86,17 @@ const WORDS = {
   panificatie: [
     'paine', 'chifl', 'baghet', 'franzel', 'covrig', 'croissant', 'cornulet', 'lipi', 'toast',
     'cozonac', 'placint', 'foietaj', 'blat', 'pita', 'lavash', 'brios', 'tortill', 'merdenea', 'pateu',
+    'painic', 'gogos', 'clatit',
   ],
   carne: [
     'carne', '=pui', 'piept', 'pulp', 'porc', 'vita', 'vitel', 'miel', 'curcan', 'tocat', 'carnat',
     'crenvurst', 'salam', 'sunc', 'parizer', 'pastram', 'bacon', 'costit', '=mici', 'peste', 'somon',
     '=ton', 'crevet', '=cod', 'macrou', 'hering', 'snitel', 'ficat', 'aripi', 'ceafa', 'muschi',
     'kaizer', 'cabanos', 'pate', 'rata', 'chorizo', 'prosciutto', 'salamuri', 'mezel', 'pastrav', 'calamar',
+    'cotlet', 'mititei', 'chiftel', 'perisoar',
   ],
   lactate: [
-    'lapte', 'iaurt', 'branz', 'telemea', 'cascaval', 'smantan', '=unt', 'frisc', 'chefir', 'kefir',
+    'lapte', 'iaurt', 'branz', 'teleme', '=unturi', '=untul', 'galbenus', 'cascaval', 'smantan', '=unt', 'frisc', 'chefir', 'kefir',
     'sana', 'mozzarel', 'parmezan', 'feta', 'mascarpone', 'ricotta', 'urda', '=cas', '=ou', '=oua',
     'oua', 'margarin', 'gouda', 'cheddar', 'brie', 'camembert', 'philadelphia', 'cottage', 'budinc',
   ],
@@ -103,11 +107,12 @@ const WORDS = {
     'taitei', 'malai', 'gris', 'conserv', 'fasole', 'linte', 'naut', 'bulion', 'sos', 'ketchup',
     'maionez', 'mustar', 'condiment', 'piper', 'boia', 'oregano', 'cimbru', 'scortisoar', 'vanili',
     'drojdi', 'bicarbonat', 'miere', '=gem', 'dulceat', 'masline', 'muratur', 'pesmet', 'sardin',
-    'zacusc', 'humus', 'supa', 'quinoa', 'cuscus', 'bulgur', 'amidon', 'gelatin', 'sirop',
+    'zacusc', 'humus', 'supa', 'quinoa', 'cuscus', 'bulgur', 'amidon', 'gelatin', 'sirop', '=fainuri', 'borcan',
+    'mamalig', 'hrisc', 'galust',
     // cafea, ceai, mic dejun
-    'cafea', 'ceai', 'cereal', 'musli', 'muesli', 'ovaz', 'fulgi', 'cacao', 'capsul', 'espresso', 'nescafe',
+    'cafea', 'cafel', 'ceai', 'cereal', 'musli', 'muesli', 'ovaz', 'fulgi', 'cacao', 'capsul', 'espresso', 'nescafe',
     // băuturi fără alcool
-    '=apa', 'suc', 'cola', 'pepsi', 'fanta', 'sprite', 'energizant', 'limonad', 'nectar', 'tonic',
+    '=apa', '=ape', 'suc', 'cola', 'pepsi', 'fanta', 'sprite', 'energizant', 'limonad', 'nectar', 'tonic',
     'socata', 'kombucha', 'redbull', 'bors', 'ayran', 'ice tea',
     // animale
     'hrana', 'pisic', 'caine', 'catel', 'whiskas', 'pedigree', 'purina', 'litiera', 'nisip pentru', 'recompense',
@@ -118,7 +123,7 @@ const WORDS = {
     'covrigei', 'saratel', 'popcorn', 'jeleu', 'guma', 'halva', 'rahat', 'eugenia', 'baton', 'snack',
     'nuci', 'alune', 'arahide', 'migdal', 'seminte', 'fistic', 'caju', 'stafide', 'praline', 'inghetata',
     // alcool
-    'bere', '=vin', 'vinul', 'vinuri', 'tuica', 'palinc', 'whisk', 'vodc', 'cidru', 'sampani', 'prosecco',
+    'bere', '=beri', '=vin', 'vinul', 'vinuri', 'tuica', 'palinc', 'whisk', 'vodc', 'cidru', 'sampani', 'prosecco',
     '=gin', '=rom', 'lichior', 'cognac', 'coniac', 'martini', 'aperol', 'jagermeister',
     // tutun
     'tigar', 'tutun', '=iqos', 'heets', 'terea', '=glo', 'neo stick', 'vape', 'brichet', 'foite',
@@ -129,7 +134,7 @@ const WORDS = {
     'detergent', 'clor', 'domestos', 'inalbitor', 'buret', 'laveta', 'lavete', 'saci', 'pungi',
     'folie', 'servetel', 'odorizant', 'mop', 'galeat', 'chibrit', 'lumanar', 'solutie', 'spray',
     'perie de wc', 'lichid', 'vanish', 'calgon', 'finish', 'mr proper', 'aluminiu', 'hartie', 'scobitor',
-    'filtre', 'burete', 'manusi de menaj',
+    'filtre', 'burete', 'manusi de menaj', 'prosop', 'gunoi',
     // igienă și cosmetice
     'sampon', 'balsam', 'sapun', 'periu', 'deodorant', 'crema', 'lotiun', 'absorbant', 'tampoan',
     'scutec', 'lame', 'parfum', 'demachiant', 'dischet', 'betisoar', 'gillette', 'ruj', 'rimel',
@@ -340,14 +345,30 @@ function guessDefault(n) {
     const hit = STEMS.find(([stem]) => word.startsWith(stem))
     if (hit) return hit[1]
   }
-  // Pluralul care schimbă finalul („paini”, „sticle”): rădăcina începe cu cuvântul fără ultima literă.
+  // Forme articulate („merele”, „painile”, „cartofilor”) și pluralul cu „oa” („sampoane”, „creioane”).
   for (const word of words) {
+    for (const v of variants(word)) {
+      if (EXACT.has(v)) return EXACT.get(v)
+      const hit = STEMS.find(([stem]) => v.startsWith(stem))
+      if (hit) return hit[1]
+    }
+  }
+  // Pluralul care schimbă finalul („paini”, „sticle”): rădăcina începe cu cuvântul fără ultima literă.
+  for (const word of words.flatMap((w) => [w, ...variants(w)])) {
     const cut = word.slice(0, -1)
     if (cut.length < 4) continue
     const hit = STEMS.find(([stem]) => stem.startsWith(cut) && stem.length <= word.length + 1)
     if (hit) return hit[1]
   }
   return DEFAULT_AISLE
+}
+
+function variants(word) {
+  const out = []
+  if (word.length >= 6 && word.endsWith('lor')) out.push(word.slice(0, -3))
+  if (word.length >= 5 && word.endsWith('le')) out.push(word.slice(0, -2))
+  if (word.includes('oa')) out.push(word.replace('oa', 'o'))
+  return out.filter((v) => v.length >= 3)
 }
 
 // Pentru listele cu raioanele vechi: băuturile, mic-dejunul și hrana animalelor aveau raioanele lor.

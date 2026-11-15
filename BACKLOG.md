@@ -2,6 +2,13 @@
 
 Idei și probleme notate pentru mai târziu.
 
+Versiunea 2.5.1 (15 noiembrie 2026) a adus adresele cunoscute propuse la invitare (din celelalte liste
+ale tale) și refuzul adreselor cu două puncte la rând, după ce Moni a fost invitată cu adresa tastată greșit
+și lista nu i-a apărut.
+
+Versiunea 2.5 (14 noiembrie 2026) a adus magazinul pe produs (cu alegerea magazinului în care ești),
+semnul de urgent, seturile de produse și mai multe forme de plural recunoscute la raioane.
+
 Versiunea 2.1 (noiembrie 2026) a adus raioane implicite mai generale (inclusiv țigări, electronice,
 rechizite, haine, cadouri) și pluralele care își găsesc raionul. Versiunea 2.0 a adus lista de cadouri (cine primește își scrie dorințele, cine cumpără
 le ia pe ascuns), produsele duplicate permise, pagina de noutăți, mulțumirile din Setări și mutarea
@@ -25,6 +32,18 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
   primul produs, varianta e ascultare continuă tot fără text parțial, cu repetările scoase la final;
 - butonul „Deschide în Chrome” din Samsung Internet; de confirmat cu Moni ce telefon și ce browser a folosit.
 
+## De verificat după 2.5
+
+- pe telefoane reale: alegerea magazinului deasupra listei, „lapte!” ca urgent, seturile;
+- regulile Firestore noi (`shops` și `sets` pe listă) nu sunt testate în emulator (nu avem Java).
+
 ## De făcut
 
 Nimic deocamdată.
+
+## Idei amânate
+
+- Totalul cumpărăturii (suma de pe bon, la „Golește rezolvatele”, cu cheltuieli pe lună și pe magazin).
+  Amânat pe 14 noiembrie 2026: lista e încă departe de ce se cumpără de fapt; revenim când seamănă mai mult.
+- Ordinea raioanelor învățată pe fiecare magazin, „Iau eu asta” când sunteți amândoi în magazin,
+  poză direct pe rândul produsului, dată și buget pe lista de cadouri.

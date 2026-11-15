@@ -320,6 +320,8 @@ a.btn.primary { color: var(--accent-text); }
 }
 .add-wrap .add { position: static; padding-bottom: 0; }
 .suggestions { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; scrollbar-width: none; }
+/* Adresele cunoscute, sub câmpul de invitare: pe mai multe rânduri, ca să se vadă întregi. */
+.suggestions.known { flex-wrap: wrap; padding: 8px 0 0; }
 .chip {
   flex: none;
   border: 1px solid var(--line); background: var(--surface);
@@ -573,3 +575,24 @@ a.btn.primary { color: var(--accent-text); }
 .check-line { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; cursor: pointer; }
 .check-line input { width: 18px; height: 18px; margin-top: 2px; flex: none; accent-color: var(--accent); }
 a.chat-btn { color: inherit; display: inline-grid; place-items: center; }
+
+/* Magazine, urgent, seturi */
+.shop-filter { display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px 0; scrollbar-width: none; }
+.chip-n { margin-left: 4px; font-size: 12px; font-weight: 700; opacity: 0.7; }
+.shop-name { font-weight: 600; color: var(--accent); }
+.urgent-tag {
+  display: inline-block; margin-left: 8px; padding: 0 7px;
+  border-radius: 6px; background: var(--danger); color: #fff;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; vertical-align: 2px;
+}
+.item.urgent { box-shadow: inset 3px 0 0 var(--danger); }
+.stack label.urgent-check { flex-direction: row; align-items: center; flex: none; margin: 0 0 10px; font-size: 15px; color: var(--text); }
+.urgent-check input { margin-top: 0; accent-color: var(--danger); }
+.stack textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); color: var(--text); font: inherit; resize: vertical;
+}
+.stack textarea:focus { outline: none; border-color: var(--accent); }
+.members li.set-row { flex-wrap: wrap; }
+.set-row .grow { flex-basis: 100%; }
+.set-btns { display: flex; gap: 6px; flex-wrap: wrap; }

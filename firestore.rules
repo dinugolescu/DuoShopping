@@ -96,7 +96,9 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/lists/$(listId)).data;
       }
       function validList(l) {
-        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients', 'recipientNames'])
+        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients', 'recipientNames', 'shops', 'sets'])
+          && (!('shops' in l) || (l.shops is list && l.shops.size() <= 20))
+          && (!('sets' in l) || (l.sets is list && l.sets.size() <= 20))
           && (!('recipientNames' in l) || (l.recipientNames is map && l.recipientNames.size() <= 40))
           && (!('kind' in l) || l.kind == 'gifts')
           && (!('recipients' in l) || (l.recipients is list && l.recipients.size() <= 30))

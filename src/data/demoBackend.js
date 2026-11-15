@@ -123,6 +123,14 @@ export function setListAisles(listId, aisles) {
   mutate((db) => { db.lists[listId].aisles = aisles })
 }
 
+export function setListShops(listId, shops) {
+  mutate((db) => { db.lists[listId].shops = shops })
+}
+
+export function setListSets(listId, sets) {
+  mutate((db) => { db.lists[listId].sets = sets })
+}
+
 export function invite(list, user, email, receives = false) {
   const e = normEmail(email)
   mutate((db) => {
@@ -211,7 +219,7 @@ export function addItem(listId, user, fields, { catalog = true } = {}) {
     db.items[listId] ??= {}
     db.items[listId][id] = item
     db.lists[listId].itemCount = (db.lists[listId].itemCount || 0) + 1
-    if (catalog) upsertProduct(db, listId, item.name, { quantity: item.quantity, aisle: item.aisle }, true)
+    if (catalog) upsertProduct(db, listId, item.name, { quantity: item.quantity, aisle: item.aisle, ...(item.shop ? { shop: item.shop } : {}) }, true)
   })
   return id
 }
@@ -224,6 +232,13 @@ export function setItemAisle(listId, item, aisle) {
   mutate((db) => {
     db.items[listId][item.id].aisle = aisle
     upsertProduct(db, listId, item.name, { aisle }, false)
+  })
+}
+
+export function setItemShop(listId, item, shop) {
+  mutate((db) => {
+    db.items[listId][item.id].shop = shop
+    upsertProduct(db, listId, item.name, { shop }, false)
   })
 }
 

@@ -4,6 +4,32 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.5.1', date: '2026-11-15',
+    ro: [
+      'La „Cine vede lista”, sub câmpul de invitare apar adresele oamenilor din celelalte liste ale tale. Scrie câteva litere („mo…”) și atinge adresa: nu mai trebuie tastată toată.',
+      'O adresă cu două puncte la rând nu mai e primită la invitare (era o greșeală de tastare care trimitea invitația la nimeni).',
+    ],
+    en: [
+      'In “Who sees the list”, the addresses of people from your other lists show up under the invite field. Type a few letters and tap the address instead of typing it all.',
+      'An address with two dots in a row is no longer accepted when inviting (a typo that sent the invitation to nobody).',
+    ],
+  },
+  {
+    v: '2.5', date: '2026-11-14',
+    ro: [
+      'Magazin pe produs: atinge un produs și alege de unde se ia (Lidl, farmacie, piață). Se ține minte pentru data viitoare. Deasupra listei alegi magazinul în care ești și vezi doar ce se ia de acolo, plus ce se poate lua de oriunde. Magazinele le pui din meniu, „Magazinele listei”.',
+      'Urgent: scrie „lapte!” sau bifează „Urgent” la produs. Produsul apare primul, cu semn roșu, iar în anunț scrie că e urgent.',
+      'Seturi de produse (meniu → „Seturi de produse”): „Grătar” sau „Mic dejun” pun toate produsele pe listă dintr-o atingere. Setul apare și ca sugestie când îi scrii numele.',
+      'Raioanele recunosc mai multe forme ale cuvintelor: „verze”, „beri”, „șampoane”, „creioane”, „merele”, „cafele”.',
+    ],
+    en: [
+      'A shop per item: tap an item and pick where it comes from (Lidl, pharmacy, market). It is remembered for next time. Above the list, pick the shop you are in to see only what comes from there, plus what can come from anywhere. Add shops from the menu, “Shops for this list”.',
+      'Urgent: type “milk!” or tick “Urgent” on the item. It shows first, with a red mark, and the announcement says it is urgent.',
+      'Item sets (menu → “Item sets”): “Barbecue” or “Breakfast” put all their items on the list in one tap. A set also shows up as a suggestion when you type its name.',
+      'Aisles recognise more word forms (mostly Romanian plurals).',
+    ],
+  },
+  {
     v: '2.4.1', date: '2026-11-11',
     ro: ['Pe iPhone, în Chrome sau în browserul din WhatsApp/Facebook, butonul de microfon te trimite la dictarea de pe tastatură (microfonul aplicației merge acolo doar din Safari).'],
     en: ['On iPhone, in Chrome or in the WhatsApp/Facebook browser, the microphone button sends you to keyboard dictation (the app’s microphone only works from Safari there).'],

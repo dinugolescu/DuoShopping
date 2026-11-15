@@ -12,8 +12,10 @@ import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic, IconLink } 
 import { safeLink, findUrl, nameFromUrl, unknownName, linkHost } from './links.js'
 import { speechSupported, appMicWorks, listen, speechErrText, parseProducts, hasSpokenAnd } from './voice.js'
 import { t } from './i18n.jsx'
+import { listShops, listSets, shopIn, splitUrgent, newShopId, MAX_SHOPS } from './shops.js'
 
 const SEEN_KEY = 'mesaje-vazute'
+const SHOP_KEY = 'magazin-ales' // magazinul ales pe fiecare listă, ținut pe telefon
 const KEYBOARD_VOICE_KEY = 'voce-prin-tastatura'
 // Dictarea de pe tastatură în locul microfonului aplicației: unde acesta n-a mers sau nu poate merge.
 const keyboardVoice = () => !!store.get(KEYBOARD_VOICE_KEY) || !appMicWorks()
@@ -32,16 +34,27 @@ export function ListView({ list, user }) {
   const [chatId, setChatId] = useState(null)
   const [showDone, setShowDone] = useState(true)
   const [seen, setSeen] = useState(() => store.get(SEEN_KEY, {}))
+  const [shopId, setShopId] = useState(() => store.get(SHOP_KEY, {})[list.id] || null)
 
   useEffect(() => api.watchItems(list.id, setItems, (e) => toast(errText(e))), [list.id, toast])
   useEffect(() => api.watchProducts(list.id, setProducts), [list.id])
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const aisles = listAisles(list)
+  const shops = listShops(list)
+  // Magazinul în care ești: vezi doar ce se ia de acolo și ce se poate lua de oriunde.
+  const atShop = shopIn(shops, shopId)
+  function pickShop(id) {
+    setShopId(id)
+    store.set(SHOP_KEY, { ...store.get(SHOP_KEY, {}), [list.id]: id })
+  }
 
   if (!items) return <div className="center muted">{t('loading')}</div>
 
-  const pending = items.filter((i) => i.status === 'pending').sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0))
+  // Cele urgente vin primele (și în raionul lor).
+  const pending = items.filter((i) => i.status === 'pending')
+    .sort((a, b) => (!!b.urgent - !!a.urgent) || ((b.addedAt ?? 0) - (a.addedAt ?? 0)))
+  const shown = atShop ? pending.filter((i) => !shopIn(shops, i.shop) || i.shop === atShop.id) : pending
   const done = items.filter((i) => i.status !== 'pending').sort((a, b) => (b.resolvedAt ?? 0) - (a.resolvedAt ?? 0))
   const editing = items.find((i) => i.id === editingId)
   const chatting = items.find((i) => i.id === chatId)
@@ -60,16 +73,19 @@ export function ListView({ list, user }) {
   // Același produs cu aceeași cantitate e deja pe listă; cu altă cantitate sau marcă („Țigări · Kent”)
   // e alt produs. Un duplicat adevărat se poate adăuga totuși, din toast.
   // `link`: produs venit dintr-un link (lipit în câmp); nu intră în sugestii.
+  // „lapte!” îl adaugă ca urgent.
   function add({ name, quantity = '', link = '' }, quiet = false, force = false) {
-    const n = name.trim()
+    const { name: n, urgent } = splitUrgent(name)
+    if (!n) return false
     const dup = !force && pending.find((i) => sameProduct(i, { name: n, quantity }))
     if (dup) {
-      if (!quiet) toast(t('alreadyOnList', dup.name), () => add({ name: n, quantity, link }, true, true), t('addAnyway'))
+      if (!quiet) toast(t('alreadyOnList', dup.name), () => add({ name, quantity, link }, true, true), t('addAnyway'))
       return false
     }
     const known = productMap.get(productKey(n))
     const aisle = known?.aisle ? knownAisle(aisles, known.aisle, n) : guessAisle(n, aisles)
-    api.addItem(list.id, user, { name: n, quantity, aisle, link }, { catalog: !link })
+    const shop = shopIn(shops, known?.shop)?.id || null
+    api.addItem(list.id, user, { name: n, quantity, aisle, link, shop, urgent }, { catalog: !link })
     return true
   }
 
@@ -113,7 +129,7 @@ export function ListView({ list, user }) {
   }
 
   const row = (i) => (
-    <ItemRow key={i.id} item={i} now={now} unread={unread(i)}
+    <ItemRow key={i.id} item={i} now={now} unread={unread(i)} shop={atShop ? null : shopIn(shops, i.shop)}
       onCheck={() => change(i, i.status === 'pending' ? 'bought' : 'pending')}
       onSkip={() => setSkipping(i)}
       onEdit={() => setEditingId(i.id)}
@@ -121,16 +137,34 @@ export function ListView({ list, user }) {
   )
 
   const groups = prefs.groupByAisle
-    ? aisles.map((a) => ({ aisle: a, items: pending.filter((i) => itemAisle(i, aisles) === a.id) })).filter((g) => g.items.length)
+    ? aisles.map((a) => ({ aisle: a, items: shown.filter((i) => itemAisle(i, aisles) === a.id) })).filter((g) => g.items.length)
     : null
 
   return (
     <main className="list">
-      <AddForm onAdd={add} onAddMany={addMany} products={products} pending={pending} enabled={prefs.suggestions} />
-      <ShopMode list={list} user={user} pendingCount={pending.length} />
+      <AddForm onAdd={add} onAddMany={addMany} products={products} pending={pending} enabled={prefs.suggestions} sets={listSets(list)} />
+      <ShopMode list={list} user={user} pendingCount={pending.length} shop={atShop} />
+      {shops.length > 0 && (
+        <div className="shop-filter" role="radiogroup" aria-label={t('shopFilter')}>
+          <button role="radio" aria-checked={!atShop} className={`chip ${atShop ? '' : 'on'}`} onClick={() => pickShop(null)}>
+            {t('shopAll')} <span className="chip-n">{pending.length}</span>
+          </button>
+          {shops.map((s) => {
+            const n = pending.filter((i) => i.shop === s.id).length
+            return (
+              <button key={s.id} role="radio" aria-checked={atShop?.id === s.id} className={`chip ${atShop?.id === s.id ? 'on' : ''}`}
+                onClick={() => pickShop(s.id)}>
+                {s.name}{n > 0 && <span className="chip-n">{n}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {pending.length === 0 ? (
         <p className="center muted pad">{done.length ? t('allDone') : t('emptyList')}</p>
+      ) : shown.length === 0 ? (
+        <p className="center muted pad">{t('shopNothing', atShop.name)}</p>
       ) : groups ? (
         groups.map((g) => (
           <section key={g.aisle.id} className="aisle">
@@ -139,7 +173,7 @@ export function ListView({ list, user }) {
           </section>
         ))
       ) : (
-        <ul className="items">{pending.map(row)}</ul>
+        <ul className="items">{shown.map(row)}</ul>
       )}
 
       {done.length > 0 && (
@@ -167,7 +201,8 @@ export function ListView({ list, user }) {
 }
 
 // `existing`: produsele de pe listă, pentru numerotarea „Produs necunoscut N” (implicit cele de cumpărat).
-export function AddForm({ onAdd, onAddMany, products, pending, enabled, placeholder, existing }) {
+// `sets`: seturile listei; cel al cărui nume îl scrii apare ca sugestie și își arată produsele înainte de adăugare.
+export function AddForm({ onAdd, onAddMany, products, pending, enabled, placeholder, existing, sets = [] }) {
   const toast = useToast()
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
@@ -210,6 +245,11 @@ export function AddForm({ onAdd, onAddMany, products, pending, enabled, placehol
       .slice(0, 5)
       .map(({ p }) => p)
   }, [name, products, pending, enabled])
+
+  const setHits = useMemo(() => {
+    const q = normalize(name)
+    return q.length < 2 ? [] : sets.filter((s) => normalize(s.name).includes(q)).slice(0, 3)
+  }, [name, sets])
 
   function showPreview(found) {
     if (found.length) setPreview(found)
@@ -276,8 +316,13 @@ export function AddForm({ onAdd, onAddMany, products, pending, enabled, placehol
           <button type="button" className="icon-btn sm" onClick={() => setLink(null)} aria-label={t('dropLink')}><IconX /></button>
         </div>
       )}
-      {suggestions.length > 0 && (
+      {suggestions.length + setHits.length > 0 && (
         <div className="suggestions" aria-label={t('historySuggestions')}>
+          {setHits.map((s) => (
+            <button key={s.id} type="button" className="chip set" onClick={() => { reset(); setPreview(s.items) }}>
+              🧺 {s.name} <span className="muted">· {t('products', s.items.length)}</span>
+            </button>
+          ))}
           {suggestions.map((p) => (
             <button key={p.id} type="button" className="chip" onClick={() => pick(p)}>
               {p.name}{p.quantity && <span className="muted"> · {p.quantity}</span>}
@@ -342,15 +387,16 @@ function PreviewSheet({ found, pending, onAdd, onClose }) {
   )
 }
 
-function ItemRow({ item, now, unread, onCheck, onSkip, onEdit, onChat }) {
+function ItemRow({ item, now, unread, shop, onCheck, onSkip, onEdit, onChat }) {
   const isDone = item.status !== 'pending'
   let meta
   if (item.status === 'bought') meta = t('metaBought', firstName(item.resolvedBy?.name), relTime(item.resolvedAt, now))
   else if (item.status === 'skipped') meta = `${reasonLabel(item)} · ${firstName(item.resolvedBy?.name)}`
   else meta = `${firstName(item.addedBy?.name)} · ${relTime(item.addedAt, now)}` + (item.postponed ? t('metaPostponed', item.postponed) : '')
+  const urgent = item.urgent && !isDone
 
   return (
-    <li className={`item ${item.status}`}>
+    <li className={`item ${item.status} ${urgent ? 'urgent' : ''}`}>
       <button className="check" onClick={onCheck}
         aria-label={isDone ? t('putBack', item.name) : t('markBought', item.name)}>
         {item.status === 'bought' && <IconCheck />}
@@ -360,9 +406,10 @@ function ItemRow({ item, now, unread, onCheck, onSkip, onEdit, onChat }) {
         <span className="item-name">
           {item.name}
           {item.quantity && <span className="qty-tag">{item.quantity}</span>}
+          {urgent && <span className="urgent-tag">{t('urgent')}</span>}
         </span>
         {item.note && <span className="item-note">{item.note}</span>}
-        <span className="item-meta">{meta}</span>
+        <span className="item-meta">{shop && !isDone && <b className="shop-name">{shop.name} · </b>}{meta}</span>
       </button>
       {safeLink(item.link) && (
         <a className="chat-btn" href={item.link} target="_blank" rel="noopener noreferrer" aria-label={t('openLink', item.name)}><IconLink /></a>
@@ -397,21 +444,41 @@ function SkipSheet({ item, onPick, onClose }) {
   )
 }
 
+const NEW_SHOP = '+'
+
 function EditSheet({ list, aisles, item, onClose, onChat }) {
   const [name, setName] = useState(item.name)
   const [qty, setQty] = useState(item.quantity || '')
   const [note, setNote] = useState(item.note || '')
   const [link, setLink] = useState(item.link || '')
   const [aisle, setAisle] = useState(itemAisle(item, aisles))
+  const [urgent, setUrgent] = useState(!!item.urgent)
+  const [made, setMade] = useState(null) // magazin adăugat acum, până apare pe listă
+  const shops = listShops(list).concat(made && !shopIn(listShops(list), made.id) ? [made] : [])
+  const was = shopIn(shops, item.shop)?.id || ''
+  const [shop, setShop] = useState(was)
   const badLink = link.trim() && !safeLink(link.trim())
 
   function save(e) {
     e.preventDefault()
     if (!name.trim() || badLink) return
-    api.updateItem(list.id, item.id, { name: name.trim(), quantity: qty.trim(), note: note.trim(), link: link.trim() })
+    api.updateItem(list.id, item.id, { name: name.trim(), quantity: qty.trim(), note: note.trim(), link: link.trim(), urgent })
+    // Magazinul ales de mână se ține minte și el pentru produsul ăsta.
+    if (shop !== was) api.setItemShop(list.id, { ...item, name: name.trim() }, shop || null)
     // Raionul ales de mână se ține minte în catalog, pentru data viitoare.
     if (aisle !== item.aisle) api.setItemAisle(list.id, { ...item, name: name.trim() }, aisle)
     onClose()
+  }
+  function pickShop(v) {
+    if (v !== NEW_SHOP) { setShop(v); return }
+    const n = (window.prompt(t('shopNewPrompt')) || '').trim().slice(0, 30)
+    if (!n) return
+    const same = shops.find((s) => normalize(s.name) === normalize(n))
+    if (same) { setShop(same.id); return }
+    const s = { id: newShopId(), name: n }
+    api.setListShops(list.id, [...shops, s])
+    setMade(s)
+    setShop(s.id)
   }
   function remove() {
     if (!window.confirm(t('deleteItemConfirm', item.name, !!item.msgCount))) return
@@ -428,6 +495,19 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
             <select value={aisle} onChange={(e) => setAisle(e.target.value)}>
               {aisles.map((a) => <option key={a.id} value={a.id}>{a.icon} {aisleLabel(a)}</option>)}
             </select>
+          </label>
+        </div>
+        <div className="row tight">
+          <label className="grow">{t('shop')}
+            <select value={shop} onChange={(e) => pickShop(e.target.value)}>
+              <option value="">{t('shopAny')}</option>
+              {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {shops.length < MAX_SHOPS && <option value={NEW_SHOP}>{t('shopNew')}</option>}
+            </select>
+          </label>
+          <label className="check-line urgent-check">
+            <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} />
+            <span>{t('urgentLabel')}</span>
           </label>
         </div>
         <label>{t('note')}<input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={t('noteEx')} /></label>
@@ -457,7 +537,7 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
 
 const IDLE_MS = 10 * 60 * 1000
 
-function ShopMode({ list, user, pendingCount }) {
+function ShopMode({ list, user, pendingCount, shop }) {
   const toast = useToast()
   const [on, setOn] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -506,7 +586,7 @@ function ShopMode({ list, user, pendingCount }) {
 
   async function announceShop() {
     setBusy(true)
-    const res = await sendAnnounce(list.id, atShopText(user), toast)
+    const res = await sendAnnounce(list.id, atShopText(user, shop), toast)
     setBusy(false)
     if (!res.ok) toast(res.error)
   }

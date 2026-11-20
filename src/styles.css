@@ -606,3 +606,9 @@ a.chat-btn { color: inherit; display: inline-grid; place-items: center; }
 .list-switch { position: relative; }
 .list-switch .news-dot { position: absolute; top: 4px; right: 2px; }
 .news-dot.inline { display: inline-block; margin-left: 8px; vertical-align: middle; }
+
+/* Poza produsului: miniatură pe rând și în fereastra de modificare */
+.item-thumb { flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: var(--accent-soft); }
+.item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.photo-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }

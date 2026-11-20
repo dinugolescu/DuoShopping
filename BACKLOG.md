@@ -39,7 +39,7 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
 
 ## De făcut
 
-Planificat pentru 2.6 (discutat pe 20 noiembrie 2026):
+Făcut în 2.6 (20 noiembrie 2026, de verificat pe telefoane reale; regulile Firestore noi — `lastAt`/`lastBy` pe listă — nu sunt testate în emulator; încă nedeployat la momentul scrierii):
 
 - Notificare către persoane alese (bife la „Gata, anunță”, implicit toți); mesajul din discuție rămâne vizibil
   tuturor, cu „către Moni” în text. Funcția `announce` primește `to` opțional.

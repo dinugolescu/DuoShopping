@@ -4,6 +4,23 @@ import { lang } from './i18n.jsx'
 
 export const CHANGELOG = [
   {
+    v: '2.6', date: '2026-11-20',
+    ro: [
+      'La „Gata, anunță” alegi cui îi trimiți: apar numele celor din listă, bifate toate. Debifează și anunțul pleacă doar la ceilalți. În discuția listei scrie „către Moni”.',
+      'Notificarea spune ce s-a scris („Adriana a scris la Lego”), iar atingerea ei deschide direct discuția produsului, nu doar lista.',
+      'Pe listele cu noutăți de la ultima ta vizită apare o bulină în meniu, iar numele listei din antet are bulină dacă e ceva nou pe altă listă.',
+      'Scrii @ în mesaje ca să chemi pe cineva din listă („@Moni”); primește o notificare care duce la mesaj. La „Cine vede lista” îi poți da fiecăruia o poreclă (se ține în cont, pe toate listele).',
+      'Poză la produs: atinge produsul și adaugă o poză (din galerie sau făcută pe loc). Apare mică pe rând, iar o atingere o mărește. Din fereastra produsului poți și să cauți poza pe net, cu numele produsului și magazinul.',
+    ],
+    en: [
+      'In “Done, announce” you pick who gets it: the names on the list show up, all ticked. Untick someone and the announcement goes only to the rest. In the list chat it reads “to Moni”.',
+      'The notification says what was written (“Adriana wrote on Lego”), and tapping it opens that item’s chat directly, not just the list.',
+      'Lists with news since your last visit get a dot in the menu, and the list name in the header has a dot when another list has something new.',
+      'Type @ in messages to call someone on the list (“@Moni”); they get a notification that leads to the message. In “Who sees the list” you can give each person a nickname (kept in your account, on all lists).',
+      'Photo on an item: tap the item and add a photo (from the gallery or taken on the spot). It shows small on the row and a tap enlarges it. From the item window you can also search for the photo online, with the item name and the shop.',
+    ],
+  },
+  {
     v: '2.5.1', date: '2026-11-15',
     ro: [
       'La „Cine vede lista”, sub câmpul de invitare apar adresele oamenilor din celelalte liste ale tale. Scrie câteva litere („mo…”) și atinge adresa: nu mai trebuie tastată toată.',

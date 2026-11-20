@@ -183,7 +183,7 @@ export function ChatSheet({ list, item, user, onClose, scope }) {
   )
 }
 
-function Lightbox({ src, onClose }) {
+export function Lightbox({ src, onClose }) {
   useBackClose(onClose)
   return (
     <div className="lightbox" onClick={onClose} role="dialog" aria-label={t('zoomedPhoto')}>

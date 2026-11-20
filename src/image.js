@@ -5,9 +5,10 @@ import { t } from './i18n.jsx'
 const MAX_SIDE = 1200
 const MAX_CHARS = 850_000 // documentele Firestore au maxim 1 MB
 
-export async function compressImage(file) {
+// `maxSide`/`maxChars` mai mici pentru pozele de pe rândul produsului (se citesc odată cu toată lista).
+export async function compressImage(file, { maxSide = MAX_SIDE, maxChars = MAX_CHARS } = {}) {
   const img = await loadImage(file)
-  const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height))
+  const scale = Math.min(1, maxSide / Math.max(img.width, img.height))
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(img.width * scale)
   canvas.height = Math.round(img.height * scale)
@@ -16,7 +17,7 @@ export async function compressImage(file) {
   // Dacă tot e prea mare, scădem calitatea treptat.
   for (const q of [0.72, 0.6, 0.45, 0.3]) {
     const url = canvas.toDataURL('image/jpeg', q)
-    if (url.length <= MAX_CHARS) return url
+    if (url.length <= maxChars) return url
   }
   throw new Error(t('photoTooBig'))
 }

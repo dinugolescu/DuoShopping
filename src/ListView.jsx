@@ -6,10 +6,11 @@ import { DEFAULT_AISLE, listAisles, fitAisle, knownAisle, aisleLabel, guessAisle
 import { relTime, fullDate } from './time.js'
 import { usePrefs } from './prefs.js'
 import { Sheet, firstName, store, useNow, useToast, errText } from './ui.jsx'
-import { ChatSheet } from './Chat.jsx'
+import { ChatSheet, Lightbox } from './Chat.jsx'
+import { compressImage } from './image.js'
 import { useOpenTarget } from './openTarget.js'
 import { sendAnnounce, atShopText } from './sheets.jsx'
-import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic, IconLink } from './icons.jsx'
+import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic, IconLink, IconCamera } from './icons.jsx'
 import { safeLink, findUrl, nameFromUrl, unknownName, linkHost } from './links.js'
 import { speechSupported, appMicWorks, listen, speechErrText, parseProducts, hasSpokenAnd } from './voice.js'
 import { t } from './i18n.jsx'
@@ -33,6 +34,7 @@ export function ListView({ list, user }) {
   const [skipping, setSkipping] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [chatId, setChatId] = useState(null)
+  const [zoom, setZoom] = useState(null) // poza unui produs, mărită
   const [showDone, setShowDone] = useState(true)
   const [seen, setSeen] = useState(() => store.get(SEEN_KEY, {}))
   const [shopId, setShopId] = useState(() => store.get(SHOP_KEY, {})[list.id] || null)
@@ -135,6 +137,7 @@ export function ListView({ list, user }) {
       onCheck={() => change(i, i.status === 'pending' ? 'bought' : 'pending')}
       onSkip={() => setSkipping(i)}
       onEdit={() => setEditingId(i.id)}
+      onZoom={setZoom}
       onChat={() => openChat(i)} />
   )
 
@@ -198,6 +201,7 @@ export function ListView({ list, user }) {
         <EditSheet list={list} aisles={aisles} item={editing} onClose={() => setEditingId(null)} onChat={() => openChat(editing)} />
       )}
       {chatting && <ChatSheet list={list} item={chatting} user={user} onClose={closeChat} />}
+      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
     </main>
   )
 }
@@ -389,7 +393,7 @@ function PreviewSheet({ found, pending, onAdd, onClose }) {
   )
 }
 
-function ItemRow({ item, now, unread, shop, onCheck, onSkip, onEdit, onChat }) {
+function ItemRow({ item, now, unread, shop, onCheck, onSkip, onEdit, onChat, onZoom }) {
   const isDone = item.status !== 'pending'
   let meta
   if (item.status === 'bought') meta = t('metaBought', firstName(item.resolvedBy?.name), relTime(item.resolvedAt, now))
@@ -404,6 +408,11 @@ function ItemRow({ item, now, unread, shop, onCheck, onSkip, onEdit, onChat }) {
         {item.status === 'bought' && <IconCheck />}
         {item.status === 'skipped' && <IconX />}
       </button>
+      {item.photo && (
+        <button className="item-thumb" onClick={() => onZoom(item.photo)} aria-label={t('productPhotoOf', item.name)}>
+          <img src={item.photo} alt="" />
+        </button>
+      )}
       <button className="item-body" onClick={onEdit}>
         <span className="item-name">
           {item.name}
@@ -455,6 +464,8 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
   const [link, setLink] = useState(item.link || '')
   const [aisle, setAisle] = useState(itemAisle(item, aisles))
   const [urgent, setUrgent] = useState(!!item.urgent)
+  const [photo, setPhoto] = useState(item.photo || null)
+  const [photoBusy, setPhotoBusy] = useState(false)
   const [made, setMade] = useState(null) // magazin adăugat acum, până apare pe listă
   const shops = listShops(list).concat(made && !shopIn(listShops(list), made.id) ? [made] : [])
   const was = shopIn(shops, item.shop)?.id || ''
@@ -464,13 +475,23 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
   function save(e) {
     e.preventDefault()
     if (!name.trim() || badLink) return
-    api.updateItem(list.id, item.id, { name: name.trim(), quantity: qty.trim(), note: note.trim(), link: link.trim(), urgent })
+    api.updateItem(list.id, item.id, { name: name.trim(), quantity: qty.trim(), note: note.trim(), link: link.trim(), urgent, ...(photo !== (item.photo || null) ? { photo } : {}) })
     // Magazinul ales de mână se ține minte și el pentru produsul ăsta.
     if (shop !== was) api.setItemShop(list.id, { ...item, name: name.trim() }, shop || null)
     // Raionul ales de mână se ține minte în catalog, pentru data viitoare.
     if (aisle !== item.aisle) api.setItemAisle(list.id, { ...item, name: name.trim() }, aisle)
     onClose()
   }
+  async function choosePhoto(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoBusy(true)
+    try { setPhoto(await compressImage(file, { maxSide: 640, maxChars: 110_000 })) } catch (err) { window.alert(err.message) } finally { setPhotoBusy(false) }
+  }
+  // Fără cheie de căutare de imagini: deschidem căutarea obișnuită cu numele produsului (și magazinul), iar poza
+  // se salvează de pe telefon (țineți apăsat pe poză) sau se face la raft.
+  const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent([name.trim(), shops.find((s) => s.id === shop)?.name].filter(Boolean).join(' '))}`
   function pickShop(v) {
     if (v !== NEW_SHOP) { setShop(v); return }
     const n = (window.prompt(t('shopNewPrompt')) || '').trim().slice(0, 30)
@@ -516,6 +537,15 @@ function EditSheet({ list, aisles, item, onClose, onChat }) {
         <label>{t('linkLabel')}<input type="url" value={link} onChange={(e) => setLink(e.target.value)} maxLength={1000}
           placeholder="https://…" autoCapitalize="off" /></label>
         {badLink && <p className="error small">{t('linkInvalid')}</p>}
+        <div className="photo-row">
+          {photo && <img className="photo-thumb" src={photo} alt={t('productPhotoOf', name)} />}
+          <label className="btn small">
+            <IconCamera /> {photo ? t('changePhoto') : t('addProductPhoto')}
+            <input type="file" accept="image/*" hidden onChange={choosePhoto} disabled={photoBusy} />
+          </label>
+          {photo && <button type="button" className="btn small danger" onClick={() => setPhoto(null)}>{t('removePhoto')}</button>}
+          {name.trim() && <a className="btn small" href={searchUrl} target="_blank" rel="noopener noreferrer">{t('searchPhoto')}</a>}
+        </div>
         <button type="button" className="btn wide-left" onClick={onChat}>
           <IconChat /> {item.msgCount ? t('chatWithCount', item.msgCount) : t('askAbout')}
         </button>

@@ -8,6 +8,7 @@ import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, Aisles
 import { IconChevron, IconUsers, IconBell, IconChat, IconX } from './icons.jsx'
 import { ChatSheet, useListChat } from './Chat.jsx'
 import { setOpenTarget } from './openTarget.js'
+import { useListNews } from './news.js'
 import { ShareInSheet, sharedFromUrl } from './ShareIn.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
@@ -149,6 +150,7 @@ function Home({ user, admin }) {
     return (a.createdAt ?? 0) - (b.createdAt ?? 0)
   })
   const current = sorted?.find((l) => l.id === currentId) || sorted?.[0] || null
+  const listNews = useListNews(sorted, current, user)
   useEffect(() => { if (current) store.set('lista-curenta', current.id) }, [current?.id])
 
   function move(id, dir) {
@@ -186,6 +188,7 @@ function Home({ user, admin }) {
         <button className="list-switch" onClick={() => setSheet('menu')} aria-label={t('pickList')}>
           <span className="list-title">{current ? current.name : 'DuoShopping'}</span>
           <IconChevron />
+          {listNews.any && <span className="news-dot" aria-label={t('newsSomewhere')} />}
         </button>
         {current && !iReceive && (
           <button className="icon-btn" onClick={() => setSheet('announce')}
@@ -237,7 +240,7 @@ function Home({ user, admin }) {
 
       {sheet === 'menu' && (
         <MenuSheet
-          user={user} admin={admin} lists={sorted} current={current}
+          user={user} admin={admin} lists={sorted} current={current} news={listNews.news}
           onPick={(id) => { setCurrentId(id); close() }}
           onCreate={create}
           onMove={move}

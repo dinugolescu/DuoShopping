@@ -55,6 +55,7 @@ export const announce = onCall(async (req) => {
     : null
 
   // Anunțul rămâne și în discuția listei: dacă cineva atinge notificarea prea repede, îl citește acolo.
+  if (!mention) await snap.ref.update({ lastAt: FieldValue.serverTimestamp(), lastBy: req.auth.uid })
   if (!mention) await db.collection(`lists/${listId}/chat`).add({
     text: text.trim().slice(0, 1000),
     photo: null,

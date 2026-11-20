@@ -600,3 +600,9 @@ a.chat-btn { color: inherit; display: inline-grid; place-items: center; }
 /* @ în mesaje: propuneri deasupra câmpului și numele chemat */
 .mention-bar { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px 0; }
 .mention { font-weight: 700; color: var(--accent, inherit); }
+
+/* Bulina de noutăți: pe numele listei din antet și pe lista din meniu */
+.news-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger, #d64545); flex: none; }
+.list-switch { position: relative; }
+.list-switch .news-dot { position: absolute; top: 4px; right: 2px; }
+.news-dot.inline { display: inline-block; margin-left: 8px; vertical-align: middle; }

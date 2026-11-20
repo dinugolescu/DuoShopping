@@ -96,7 +96,7 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/lists/$(listId)).data;
       }
       function validList(l) {
-        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients', 'recipientNames', 'shops', 'sets'])
+        return l.keys().hasOnly(['name', 'ownerUid', 'ownerEmail', 'memberEmails', 'itemCount', 'createdAt', 'aisles', 'kind', 'recipients', 'recipientNames', 'shops', 'sets', 'lastAt', 'lastBy'])
           && (!('shops' in l) || (l.shops is list && l.shops.size() <= 20))
           && (!('sets' in l) || (l.sets is list && l.sets.size() <= 20))
           && (!('recipientNames' in l) || (l.recipientNames is map && l.recipientNames.size() <= 40))
@@ -129,7 +129,7 @@ service cloud.firestore {
       // Cine primește cadouri nu schimbă nimic la listă, în afară de numărul de produse și ieșirea din ea.
       function receiverChangeOk(before, after) {
         return !receives(before)
-          || after.diff(before).affectedKeys().hasOnly(['itemCount'])
+          || after.diff(before).affectedKeys().hasOnly(['itemCount', 'lastAt', 'lastBy'])
           || (after.diff(before).affectedKeys().hasOnly(['memberEmails', 'recipients'])
               && after.memberEmails == before.memberEmails.removeAll([myEmail()]));
       }

@@ -247,13 +247,16 @@ export function watchWishes(listId, uid, cb, onError) {
   return listen(q, cb, onError)
 }
 
+// Semnul de „s-a mișcat ceva” pe lista: de aici vin bulinele de pe liste (cine a schimbat ultimul și când).
+const bump = (user) => ({ lastAt: serverTimestamp(), lastBy: user.uid })
+
 // `catalog: false` (lista de cadouri): produsul nu intră în sugestii.
 export function addItem(listId, user, fields, { catalog = true } = {}) {
   const ref = doc(itemsCol(listId))
   const item = newItemFields(user, fields)
   const b = writeBatch(db)
   b.set(ref, { ...item, addedAt: serverTimestamp() })
-  b.update(listDoc(listId), { itemCount: increment(1) })
+  b.update(listDoc(listId), { itemCount: increment(1), ...bump(user) })
   // Catalogul listei: de aici vin sugestiile și raionul ținut minte.
   if (catalog) b.set(doc(productsCol(listId), productKey(item.name)), {
     name: item.name, quantity: item.quantity, aisle: item.aisle, count: increment(1), lastAt: serverTimestamp(),
@@ -305,6 +308,7 @@ export function setStatus(listId, itemId, user, status, reason = null, reasonTex
     resolvedBy: done ? who(user) : null,
     resolvedAt: done ? serverTimestamp() : null,
   }))
+  fire(updateDoc(listDoc(listId), bump(user)))
 }
 
 // ---------- Partea ascunsă a listei de cadouri (doar pentru cei care cumpără) ----------
@@ -384,6 +388,8 @@ export function sendMessage(listId, itemId, user, { text = '', photo = null }, s
   const b = writeBatch(db)
   b.set(doc(msgsCol(listId, itemId, scope)), { text: text.trim(), photo, by: who(user), at: serverTimestamp(), reactions: {} })
   counter(b, listId, itemId, scope, { msgCount: increment(1), lastMsgAt: serverTimestamp(), lastMsgBy: user.uid })
+  // Partea ascunsă a cadourilor nu aprinde nimic pe lista (cine primește n-ar trebui să simtă că se întâmplă ceva).
+  if (scope !== 'secret') b.update(listDoc(listId), bump(user))
   fire(b.commit())
 }
 

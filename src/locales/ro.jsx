@@ -246,6 +246,8 @@ export default {
   announceFor: (names) => `către ${names}`,
   aliasBtn: 'Poreclă',
   aliasPrompt: (who) => `Cum o chemi pe ${who} în mesaje? Se scrie apoi cu @ (ex. @Moni). Lasă gol ca să o ștergi.`,
+  newsSomewhere: 'Sunt noutăți pe altă listă',
+  newsOnList: 'Noutăți pe lista asta',
   mentionHint: 'Scrie @ ca să chemi pe cineva din listă',
   mentionPing: (name) => `${name} te-a chemat`,
   announceAlone: (list) => `Ești singur în lista ${q(list)}. Invită pe cineva ca să aibă cine primi anunțul.`,

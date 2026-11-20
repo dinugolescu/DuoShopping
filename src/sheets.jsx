@@ -20,7 +20,7 @@ const products = (n) => t('products', n)
 
 // ---------- Meniul cu liste ----------
 
-export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMove, onOpen, onClose }) {
+export function MenuSheet({ user, admin, lists, current, news, onPick, onCreate, onMove, onOpen, onClose }) {
   const [newName, setNewName] = useState('')
   const [gift, setGift] = useState(false)
   const giftList = isGiftList(current)
@@ -46,7 +46,7 @@ export function MenuSheet({ user, admin, lists, current, onPick, onCreate, onMov
         {lists.map((l, idx) => (
           <div key={l.id} className="choice-row">
             <button className={`choice grow ${l.id === current?.id ? 'active' : ''}`} onClick={() => onPick(l.id)}>
-              <span>{l.name}</span>
+              <span>{l.name}{news?.has(l.id) && <span className="news-dot inline" aria-label={t('newsOnList')} />}</span>
               <span className="muted small">{receivesIn(l, user) ? t('giftListOption') : products(l.itemCount)} · {people(l.memberEmails.length)}</span>
             </button>
             {lists.length > 1 && (

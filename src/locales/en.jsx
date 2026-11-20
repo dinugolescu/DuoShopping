@@ -250,6 +250,8 @@ export default {
   announceFor: (names) => `to ${names}`,
   aliasBtn: 'Nickname',
   aliasPrompt: (who) => `What do you call ${who} in messages? You then write it with @ (e.g. @Mom). Leave empty to remove it.`,
+  newsSomewhere: 'There is news on another list',
+  newsOnList: 'News on this list',
   mentionHint: 'Type @ to call someone on the list',
   mentionPing: (name) => `${name} mentioned you`,
   announceAlone: (list) => `You're alone in the list ${q(list)}. Invite someone so there's someone to get the announcement.`,

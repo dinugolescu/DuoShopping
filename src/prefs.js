@@ -14,7 +14,7 @@ export const FONTS = [
   { id: 'hand', css: '"Patrick Hand", cursive', google: 'Patrick+Hand' },
 ]
 
-const DEFAULTS = { lang: 'ro', theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [], personalLists: [] }
+const DEFAULTS = { lang: 'ro', theme: 'auto', font: 'system', suggestions: true, groupByAisle: true, icon: DEFAULT_ICON.design, iconColor: DEFAULT_ICON.color, listOrder: [], personalLists: [], aliases: {} }
 const KEY = 'cumparaturi-prefs'
 
 function load() {

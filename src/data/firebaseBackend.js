@@ -513,9 +513,10 @@ export async function disablePush() {
 }
 
 // Trimite anunțul celorlalți membri. Întoarce { phones, withoutPhone: [emailuri] }.
-export async function announce(listId, text) {
+// `opts`: { to: [emailuri], toNames, itemId, scope, mention } (vezi funcția `announce` din cloud).
+export async function announce(listId, text, opts = {}) {
   const { getFunctions, httpsCallable } = await import('firebase/functions')
   const call = httpsCallable(getFunctions(app, 'europe-central2'), 'announce')
-  const res = await call({ listId, text })
+  const res = await call({ listId, text, ...opts })
   return res.data
 }

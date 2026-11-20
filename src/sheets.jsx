@@ -3,7 +3,8 @@ import * as api from './data/index.js'
 import { THEMES, FONTS, usePrefs, setPref } from './prefs.js'
 import { relTime } from './time.js'
 import { Sheet, Switch, firstName, useToast, errText, announceErrText, store } from './ui.jsx'
-import { myEvents, markAnnounced, eventsSummary, FIRST_CUTOFF, validEmail } from './data/shared.js'
+import { myEvents, markAnnounced, eventsSummary, eventsTarget, FIRST_CUTOFF, validEmail } from './data/shared.js'
+import { personName, cleanAlias } from './people.js'
 import { IconUp, IconChevron } from './icons.jsx'
 import { AISLES, DEFAULT_AISLE, LEGACY, listAisles, guessAisle, knownAisle, normalize, aisleLabel, canonicalAisleLabel } from './aisles.js'
 import { reasonLabel } from './config.js'
@@ -137,6 +138,17 @@ export function ShareSheet({ list, lists = [], user, admin, fresh, onClose }) {
     setInvited(v)
   }
 
+  // Poreclă pentru @ în mesaje (rămâne în setările tale, pe toate listele).
+  const aliases = usePrefs().aliases || {}
+  function setAlias(m) {
+    const v = window.prompt(t('aliasPrompt', m), aliases[m] || '')
+    if (v === null) return
+    const next = { ...aliases }
+    const a = cleanAlias(v)
+    if (a) next[m] = a; else delete next[m]
+    setPref('aliases', next)
+  }
+
   function kick(m) {
     if (!window.confirm(t('kickConfirm', m, list.name))) return
     api.removeMember(list, m)
@@ -156,6 +168,7 @@ export function ShareSheet({ list, lists = [], user, admin, fresh, onClose }) {
           <li key={m}>
             <span className="grow">
               {m}{m === user.email && <span className="muted">{t('youMark')}</span>}
+              {aliases[m] && <span className="badge">@{aliases[m]}</span>}
               {m === list.ownerEmail && <span className="badge">{t('listCreator')}</span>}
               {gift && !iReceive && (
                 <span className="muted small block">{recipients.includes(m) ? t('roleReceives') : t('roleBuys')}</span>
@@ -165,6 +178,9 @@ export function ShareSheet({ list, lists = [], user, admin, fresh, onClose }) {
               <button className="btn small" onClick={() => api.setReceives(list.id, m, !recipients.includes(m))}>
                 {recipients.includes(m) ? t('makeBuyer') : t('makeReceiver')}
               </button>
+            )}
+            {m !== user.email && (
+              <button className="btn small" onClick={() => setAlias(m)}>{t('aliasBtn')}</button>
             )}
             {canRemove && m !== list.ownerEmail && m !== user.email && (
               <button className="btn small danger" onClick={() => kick(m)}>{t('remove')}</button>
@@ -461,7 +477,7 @@ export function useAnnounce(list, user) {
   return { pending, mark }
 }
 
-const EVENT_LABEL = { added: 'evAdded', bought: 'evBought', skipped: 'evSkipped' }
+const EVENT_LABEL = { added: 'evAdded', bought: 'evBought', skipped: 'evSkipped', message: 'evMessage', secretMsg: 'evSecretMessage' }
 
 export function AnnounceSheet({ list, user, pending, mark, onClose }) {
   const toast = useToast()
@@ -471,6 +487,15 @@ export function AnnounceSheet({ list, user, pending, mark, onClose }) {
   const [err, setErr] = useState('')
 
   const others = list.memberEmails.filter((m) => m !== user.email)
+  // Pe o listă de cadouri, cei care primesc cadouri nu primesc anunțuri; nici nu apar la alegere.
+  const aliases = usePrefs().aliases
+  const candidates = others.filter((m) => !(isGiftList(list) && (list.recipients || []).includes(m)))
+  const [skipTo, setSkipTo] = useState(() => new Set()) // persoanele debifate
+  const chosen = candidates.filter((m) => !skipTo.has(m))
+  const toggleTo = (m) => setSkipTo((s) => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n })
+  // Doar dacă n-ai ales pe toți trimitem lista; altfel funcția din cloud anunță pe toți, ca până acum.
+  const toOpts = chosen.length < candidates.length
+    ? { to: chosen, toNames: chosen.map((m) => personName(m, aliases)) } : {}
   const picked = pending ? pending.filter((e) => !off.has(e.key)) : []
   const keys = picked.map((e) => e.key)
   const summary = pending ? eventsSummary(picked, user) : null
@@ -479,10 +504,10 @@ export function AnnounceSheet({ list, user, pending, mark, onClose }) {
   const toggle = (key) => setOff((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n })
   const all = pending && off.size === 0
 
-  async function send(message, withEvents) {
+  async function send(message, withEvents, extra = {}) {
     setBusy(true)
     setErr('')
-    const res = await sendAnnounce(list.id, message, toast)
+    const res = await sendAnnounce(list.id, message, toast, { ...toOpts, ...extra })
     setBusy(false)
     if (res.ok) {
       if (withEvents && keys.length) mark(keys)
@@ -527,6 +552,19 @@ export function AnnounceSheet({ list, user, pending, mark, onClose }) {
             </>
           )}
           {pending && !pending.length && <p className="muted">{t('nothingNew')}</p>}
+          {candidates.length > 1 && (
+            <>
+              <div className="ann-head">
+                <h3>{t('announceTo')} <span className="muted small">{t('announceToN', chosen.length, candidates.length)}</span></h3>
+              </div>
+              <div className="gift-for" role="group" aria-label={t('announceTo')}>
+                {candidates.map((m) => (
+                  <button key={m} type="button" aria-pressed={!skipTo.has(m)} className={`chip ${skipTo.has(m) ? '' : 'on'}`}
+                    onClick={() => toggleTo(m)}>{personName(m, aliases)}</button>
+                ))}
+              </div>
+            </>
+          )}
           <div className="announce-preview">
             <b>{list.name}</b>
             <span>{summary ? summary.text : t('loading')}</span>
@@ -535,7 +573,7 @@ export function AnnounceSheet({ list, user, pending, mark, onClose }) {
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={150}
             placeholder={t('announceNotePh')} aria-label={t('announceNoteLabel')} />
           {err && <p className="error">{err}</p>}
-          <button className="btn primary wide" disabled={busy || !summary} onClick={() => send(text, true)}>
+          <button className="btn primary wide" disabled={busy || !summary || !chosen.length} onClick={() => send(text, true, eventsTarget(picked))}>
             {busy ? t('sending') : keys.length ? t('sendAnnounceN', keys.length) : t('sendAnnounce')}
           </button>
           {pending && pending.length > 0 && (
@@ -555,9 +593,9 @@ export function AnnounceSheet({ list, user, pending, mark, onClose }) {
 export const atShopText = (user, shop) => (shop ? t('atShopNamed', firstName(user.name), shop.name) : t('atShopText', firstName(user.name)))
 
 // Trimite un anunț și arată rezultatul. Întoarce { ok } sau { ok: false, error } (mesaj clar că n-a plecat).
-export async function sendAnnounce(listId, text, toast) {
+export async function sendAnnounce(listId, text, toast, opts) {
   try {
-    const r = await api.announce(listId, text)
+    const r = await api.announce(listId, text, opts)
     if (r.demo) toast(t('announceDemo'))
     else if (r.phones > 0) toast(r.withoutPhone.length ? t('announceSentMissing', r.withoutPhone.join(', ')) : t('announceSent'))
     else toast(t('announceNobody'))

@@ -7,6 +7,7 @@ import { relTime, fullDate } from './time.js'
 import { usePrefs } from './prefs.js'
 import { Sheet, firstName, store, useNow, useToast, errText } from './ui.jsx'
 import { ChatSheet } from './Chat.jsx'
+import { useOpenTarget } from './openTarget.js'
 import { sendAnnounce, atShopText } from './sheets.jsx'
 import { IconCheck, IconX, IconPlus, IconChevron, IconChat, IconMic, IconLink } from './icons.jsx'
 import { safeLink, findUrl, nameFromUrl, unknownName, linkHost } from './links.js'
@@ -38,6 +39,7 @@ export function ListView({ list, user }) {
 
   useEffect(() => api.watchItems(list.id, setItems, (e) => toast(errText(e))), [list.id, toast])
   useEffect(() => api.watchProducts(list.id, setProducts), [list.id])
+  useOpenTarget(list.id, (tg) => { setEditingId(null); setChatId(tg.itemId) }) // atingerea unei notificări
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const aisles = listAisles(list)

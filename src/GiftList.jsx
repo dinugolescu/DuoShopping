@@ -8,6 +8,7 @@ import * as api from './data/index.js'
 import { relTime } from './time.js'
 import { Sheet, firstName, useNow, useToast, errText } from './ui.jsx'
 import { ChatSheet } from './Chat.jsx'
+import { useOpenTarget } from './openTarget.js'
 import { AddForm } from './ListView.jsx'
 import { IconChat, IconLock, IconLink } from './icons.jsx'
 import { t } from './i18n.jsx'
@@ -87,6 +88,7 @@ function BuyerView({ list, user }) {
   const [editingId, setEditingId] = useState(null)
   const [chat, setChat] = useState(null) // { id, scope }
   useEffect(() => watchGiftItems(list.id, setItems, (e) => toast(errText(e))), [list.id, toast])
+  useOpenTarget(list.id, (tg) => { setEditingId(null); setChat({ id: tg.itemId, scope: tg.scope }) }) // atingerea unei notificări
   useEffect(() => { if (!recipients.includes(forEmail)) setForEmail(recipients[0] || null) }, [recipients.join(), forEmail])
 
   if (!items) return <div className="center muted">{t('loading')}</div>

@@ -7,6 +7,7 @@ import { isGiftList, receivesIn } from './gifts.js'
 import { MenuSheet, ShareSheet, SettingsSheet, AdminSheet, AnnounceSheet, AislesSheet, ShopsSheet, SetsSheet, HistorySheet, useAnnounce } from './sheets.jsx'
 import { IconChevron, IconUsers, IconBell, IconChat, IconX } from './icons.jsx'
 import { ChatSheet, useListChat } from './Chat.jsx'
+import { setOpenTarget } from './openTarget.js'
 import { ShareInSheet, sharedFromUrl } from './ShareIn.jsx'
 import { usePrefs, setPref, startPrefsSync } from './prefs.js' // importul aplică tema, fontul și iconița salvate, înainte de primul ecran
 import { iconDataUrl } from './appIcons.js'
@@ -102,7 +103,11 @@ function listFromUrl() {
   const params = new URLSearchParams(window.location.search)
   const id = params.get('list')
   if (id) {
+    // Produsul și discuția lui (de la o notificare care spune la ce s-a scris): le ia lista când se deschide.
+    setOpenTarget({ listId: id, itemId: params.get('item'), scope: params.get('scope') || undefined })
     params.delete('list')
+    params.delete('item')
+    params.delete('scope')
     const rest = params.toString()
     window.history.replaceState(window.history.state, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash)
   }
@@ -118,7 +123,12 @@ function Home({ user, admin }) {
   const [currentId, setCurrentId] = useState(() => START_LIST || store.get('lista-curenta'))
   // Atingerea unei notificări deschide lista ei: prin adresă (`?list=`) sau prin mesaj de la service worker.
   useEffect(() => {
-    const onMsg = (e) => { if (e.data?.type === 'open-list') { setCurrentId(e.data.listId); setSheet(null) } }
+    const onMsg = (e) => {
+      if (e.data?.type !== 'open-list') return
+      setOpenTarget({ listId: e.data.listId, itemId: e.data.itemId, scope: e.data.scope || undefined })
+      setCurrentId(e.data.listId)
+      setSheet(null)
+    }
     navigator.serviceWorker?.addEventListener('message', onMsg)
     return () => navigator.serviceWorker?.removeEventListener('message', onMsg)
   }, [])

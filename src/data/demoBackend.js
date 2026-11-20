@@ -390,12 +390,13 @@ export async function enablePush() { throw new Error(t('pushDemo')) }
 export async function disablePush() {}
 export async function refreshPush() {}
 // Ca în cloud: anunțul rămâne și în discuția listei.
-export async function announce(listId, text) {
+export async function announce(listId, text, opts = {}) {
   const user = currentUser()
+  if (opts.mention) return { demo: true }
   mutate((db) => {
     const id = newId()
     db.messages[`l:${listId}`] ??= {}
-    db.messages[`l:${listId}`][id] = { id, text: text.trim().slice(0, 1000), photo: null, by: who(user), at: Date.now(), reactions: {}, announce: true }
+    db.messages[`l:${listId}`][id] = { id, text: text.trim().slice(0, 1000), photo: null, by: who(user), at: Date.now(), reactions: {}, announce: true, ...(opts.toNames?.length ? { to: opts.toNames } : {}) }
   })
   return { phones: 0, withoutPhone: [], demo: true }
 }

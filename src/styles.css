@@ -596,3 +596,7 @@ a.chat-btn { color: inherit; display: inline-grid; place-items: center; }
 .members li.set-row { flex-wrap: wrap; }
 .set-row .grow { flex-basis: 100%; }
 .set-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* @ în mesaje: propuneri deasupra câmpului și numele chemat */
+.mention-bar { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px 0; }
+.mention { font-weight: 700; color: var(--accent, inherit); }

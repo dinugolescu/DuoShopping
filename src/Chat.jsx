@@ -7,6 +7,9 @@ import { relTime } from './time.js'
 import { Sheet, firstName, useNow, useToast, errText, useBackClose, store } from './ui.jsx'
 import { IconCamera, IconSend, IconX } from './icons.jsx'
 import { t } from './i18n.jsx'
+import { usePrefs } from './prefs.js'
+import { personName, mentionedEmails, partialMention, splitMentions, fold } from './people.js'
+import { isGiftList } from './gifts.js'
 
 const LIST_SEEN_KEY = 'discutie-lista-vazuta'
 const BANNER_MAX_AGE = 2 * 24 * 3600 * 1000
@@ -59,10 +62,25 @@ export function ChatSheet({ list, item, user, onClose, scope }) {
     try { setPhoto(await compressImage(file)) } catch (err) { toast(err.message) } finally { setBusy(false) }
   }
 
+  // Cine poate fi chemat cu @: ceilalți din listă (pe cadouri, fără cei care primesc).
+  const aliases = usePrefs().aliases
+  const receivers = isGiftList(list) ? list.recipients || [] : []
+  const callable = list.memberEmails.filter((m) => m !== user.email && !receivers.includes(m))
+  const partial = partialMention(text)
+  const suggestions = partial === null ? [] : callable.filter((m) => fold(personName(m, aliases)).startsWith(fold(partial))).slice(0, 5)
+  const pickMention = (m) => setText((s) => s.replace(/@([\p{L}\p{N}_]*)$/u, `@${personName(m, aliases)} `))
+
   function send(e) {
     e.preventDefault()
     if (!text.trim() && !photo) return
     api.sendMessage(list.id, item?.id, user, { text, photo }, scope)
+    // Cine e chemat cu @ primește o notificare care duce la mesaj.
+    const called = mentionedEmails(text, callable, user.email, aliases)
+    if (called.length) {
+      api.announce(list.id, `${firstName(user.name)}: ${text.trim()}`.slice(0, 400), {
+        to: called, itemId: item?.id, ...(scope === 'secret' ? { scope } : {}), mention: true,
+      }).catch((err) => console.error(err))
+    }
     setText('')
     setPhoto(null)
   }
@@ -104,8 +122,8 @@ export function ChatSheet({ list, item, user, onClose, scope }) {
                     onClick={(e) => { e.stopPropagation(); setZoom(m.photo) }} />
                 )}
                 {m.photoDeleted && <span className="msg-text muted small">{t('photoDeleted')}</span>}
-                {m.announce && <span className="msg-kind">📣 {t('announceMsg')}</span>}
-                {m.text && <span className="msg-text">{m.text}</span>}
+                {m.announce && <span className="msg-kind">📣 {t('announceMsg')}{m.to?.length > 0 && ` · ${t('announceFor', m.to.join(', '))}`}</span>}
+                {m.text && <span className="msg-text">{splitMentions(m.text).map((p, k) => (p.tag ? <b key={k} className="mention">{p.text}</b> : p.text))}</span>}
                 <span className="msg-time">{relTime(m.at, now)}</span>
               </button>
               {shown.length > 0 && (
@@ -141,13 +159,22 @@ export function ChatSheet({ list, item, user, onClose, scope }) {
           <button className="icon-btn" onClick={() => setPhoto(null)} aria-label={t('dropPhoto')}><IconX /></button>
         </div>
       )}
+      {suggestions.length > 0 && (
+        <div className="mention-bar" role="listbox" aria-label={t('mentionHint')}>
+          {suggestions.map((m) => (
+            <button key={m} type="button" className="chip" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => pickMention(m)}>
+              @{personName(m, aliases)}
+            </button>
+          ))}
+        </div>
+      )}
       <form className="composer" onSubmit={send}>
         <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} disabled={busy} aria-label={t('attachPhoto')}>
           <IconCamera />
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={choosePhoto} />
         <input className="grow" value={text} onChange={(e) => setText(e.target.value)}
-          placeholder={busy ? t('preparingPhoto') : t('writeMsg')} maxLength={1000} enterKeyHint="send" aria-label={t('message')} />
+          placeholder={busy ? t('preparingPhoto') : callable.length ? `${t('writeMsg')} · @` : t('writeMsg')} maxLength={1000} enterKeyHint="send" aria-label={t('message')} />
         <button className="add-btn" disabled={busy || (!text.trim() && !photo)} aria-label={t('send')}><IconSend /></button>
       </form>
 

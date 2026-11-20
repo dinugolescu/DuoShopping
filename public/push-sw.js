@@ -12,7 +12,12 @@ self.addEventListener('push', (event) => {
     tag: d.tag || undefined,
     renotify: !!d.tag,
     // Lista din care vine anunțul (din `tag`, „lista-<id>”), ca atingerea să deschidă direct lista.
-    data: { url: d.url || '/', listId: (d.tag || '').startsWith('lista-') ? d.tag.slice(6) : null },
+    data: {
+      url: d.url || '/',
+      listId: (d.tag || '').startsWith('lista-') ? d.tag.slice(6) : null,
+      itemId: d.item || null, // produsul la care s-a scris, ca atingerea să deschidă discuția lui
+      scope: d.scope || null,
+    },
   }))
 })
 
@@ -20,14 +25,16 @@ self.addEventListener('push', (event) => {
 // deschidem direct la listă (`?list=<id>`). Unde aducerea în față nu merge (iPhone), o deschidem din nou.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const { url: path = '/', listId } = event.notification.data || {}
+  const { url: path = '/', listId, itemId, scope } = event.notification.data || {}
   const url = new URL(path, self.location.origin)
   if (listId) url.searchParams.set('list', listId)
+  if (listId && itemId) url.searchParams.set('item', itemId)
+  if (listId && itemId && scope) url.searchParams.set('scope', scope)
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     const open = wins.find((w) => w.url.startsWith(self.location.origin))
     if (open) {
-      if (listId) open.postMessage({ type: 'open-list', listId })
+      if (listId) open.postMessage({ type: 'open-list', listId, itemId, scope })
       try { await open.focus(); return } catch { /* continuăm cu deschiderea */ }
     }
     return self.clients.openWindow(url.href)

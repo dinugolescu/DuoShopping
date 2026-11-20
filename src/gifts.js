@@ -28,6 +28,8 @@ export function mergeSecret(items, secret) {
       resolvedBy: s.resolvedBy || null,
       resolvedAt: s.resolvedAt ?? null,
       secretMsgCount: s.msgCount || 0,
+      secretLastMsgAt: s.lastMsgAt ?? null,
+      secretLastMsgBy: s.lastMsgBy ?? null,
     }
   })
 }

@@ -71,6 +71,11 @@ export function myEvents(items, user, state) {
     if (i.status !== 'pending' && i.resolvedBy?.uid === user.uid && i.resolvedAt) {
       out.push({ key: `${i.status[0]}:${i.id}:${i.resolvedAt}`, type: i.status, item: i, at: i.resolvedAt })
     }
+    // Un mesaj scris la un produs (și la partea ascunsă a unui cadou) e tot o noutate de anunțat.
+    if (i.msgCount > 0 && i.lastMsgBy === user.uid && i.lastMsgAt) out.push({ key: `m:${i.id}:${i.lastMsgAt}`, type: 'message', item: i, at: i.lastMsgAt })
+    if (i.secretMsgCount > 0 && i.secretLastMsgBy === user.uid && i.secretLastMsgAt) {
+      out.push({ key: `s:${i.id}:${i.secretLastMsgAt}`, type: 'secretMsg', item: i, at: i.secretLastMsgAt })
+    }
   }
   return out.filter((e) => e.at > cutoff && !done.has(e.key)).sort((a, b) => b.at - a.at)
 }
@@ -103,10 +108,21 @@ function names(list) {
 export function eventsSummary(events, user) {
   const of = (type) => events.filter((e) => e.type === type).map((e) => e.item)
   const added = of('added'), bought = of('bought'), skipped = of('skipped')
+  const wrote = [...of('message'), ...of('secretMsg')]
   const parts = []
   if (added.length) parts.push(t('sumAdded', count(added.length), names(added)))
   if (bought.length) parts.push(t('sumBought', count(bought.length)))
   if (skipped.length) parts.push(t('sumSkipped', count(skipped.length), names(skipped)))
+  if (wrote.length) parts.push(t('sumWrote', names(wrote)))
   const first = String(user.name || '').split(' ')[0]
   return { text: parts.length ? t('sumText', first, parts) : t('sumNothing', first), empty: !parts.length }
+}
+
+// Unde duce atingerea notificării: dacă anunțul vorbește despre un singur produs cu mesaj, deschidem discuția lui.
+export function eventsTarget(events) {
+  const msgs = events.filter((e) => e.type === 'message' || e.type === 'secretMsg')
+  const ids = new Set(events.map((e) => e.item.id))
+  if (ids.size !== 1 || !msgs.length) return {}
+  const secret = msgs.every((e) => e.type === 'secretMsg')
+  return { itemId: [...ids][0], ...(secret ? { scope: 'secret' } : {}) }
 }

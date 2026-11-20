@@ -13,6 +13,7 @@ setGlobalOptions({ region: 'europe-central2', maxInstances: 2 })
 const db = getFirestore()
 
 const MIN_GAP_MS = 20_000 // un anunț la cel mult 20 de secunde de la același om
+const MENTION_GAP_MS = 3_000 // o chemare cu @ poate veni mai des (câte una pe mesaj)
 const OLD_HOST = 'duoshopping-9d75f.web.app'
 const DEAD_TOKEN = new Set([
   'messaging/registration-token-not-registered',
@@ -24,7 +25,9 @@ export const announce = onCall(async (req) => {
   const email = token?.email?.toLowerCase()
   if (!email || token.email_verified !== true) throw new HttpsError('unauthenticated', 'Intră în cont ca să trimiți anunțuri.')
 
-  const { listId, text } = req.data || {}
+  // `to`: doar aceste adrese primesc (altfel toți ceilalți); `itemId`/`scope`: unde duce atingerea notificării;
+  // `mention`: chemare cu @ dintr-un mesaj (nu se mai salvează în discuția listei, mesajul e deja acolo).
+  const { listId, text, to, toNames, itemId, scope, mention } = req.data || {}
   if (typeof listId !== 'string' || !listId || listId.includes('/') || typeof text !== 'string' || !text.trim()) {
     throw new HttpsError('invalid-argument', 'Anunțul nu e complet.')
   }
@@ -34,25 +37,32 @@ export const announce = onCall(async (req) => {
   const list = snap.data()
   if (!list.memberEmails?.includes(email)) throw new HttpsError('permission-denied', 'Nu ești în lista asta.')
 
-  const logRef = db.doc(`announceLog/${req.auth.uid}`)
+  const logRef = db.doc(`announceLog/${req.auth.uid}${mention ? '-m' : ''}`)
   const last = (await logRef.get()).get('at')?.toMillis() ?? 0
-  if (Date.now() - last < MIN_GAP_MS) throw new HttpsError('resource-exhausted', 'Ai trimis un anunț acum câteva secunde.')
+  if (Date.now() - last < (mention ? MENTION_GAP_MS : MIN_GAP_MS)) throw new HttpsError('resource-exhausted', 'Ai trimis un anunț acum câteva secunde.')
   await logRef.set({ at: FieldValue.serverTimestamp() })
 
   // Pe o listă de cadouri, cei care primesc cadouri nu primesc anunțurile (ar strica surpriza).
   const recipients = list.kind === 'gifts' ? list.recipients || [] : []
   if (recipients.includes(email)) throw new HttpsError('permission-denied', 'Pe lista asta primești cadouri.')
-  const others = list.memberEmails.filter((e) => e !== email && !recipients.includes(e))
+  const wanted = Array.isArray(to) ? new Set(to.map((e) => String(e).toLowerCase())) : null
+  const others = list.memberEmails.filter((e) => e !== email && !recipients.includes(e) && (!wanted || wanted.has(e)))
   if (!others.length) return { phones: 0, withoutPhone: [] }
+  // Un anunț cu o listă aleasă poartă în discuție și numele celor către care e („către Moni”), ca să nu fie în doi peretți.
+  const toNote = wanted && others.length < list.memberEmails.filter((e) => e !== email && !recipients.includes(e)).length
+  const addressed = toNote
+    ? (Array.isArray(toNames) ? toNames : others.map((e) => e.split('@')[0])).slice(0, 10).map((n) => String(n).slice(0, 40))
+    : null
 
   // Anunțul rămâne și în discuția listei: dacă cineva atinge notificarea prea repede, îl citește acolo.
-  await db.collection(`lists/${listId}/chat`).add({
+  if (!mention) await db.collection(`lists/${listId}/chat`).add({
     text: text.trim().slice(0, 1000),
     photo: null,
     by: { uid: req.auth.uid, name: token.name || email },
     at: FieldValue.serverTimestamp(),
     reactions: {},
     announce: true,
+    ...(addressed ? { to: addressed } : {}),
   })
 
   const tokSnap = await db.collection('pushTokens').where('email', 'in', others.slice(0, 30)).get()
@@ -72,7 +82,11 @@ export const announce = onCall(async (req) => {
   // Mesaj doar cu date: service worker-ul aplicației (public/push-sw.js) afișează notificarea.
   const res = await getMessaging().sendEachForMulticast({
     tokens,
-    data: { title: list.name, body: text.trim().slice(0, 400), url: '/', tag: `lista-${listId}` },
+    data: {
+      title: list.name, body: text.trim().slice(0, 400), url: '/', tag: `lista-${listId}`,
+      ...(typeof itemId === 'string' && itemId && !itemId.includes('/') ? { item: itemId } : {}),
+      ...(scope === 'secret' ? { scope } : {}),
+    },
     webpush: { headers: { Urgency: 'high', TTL: String(24 * 3600) } },
   })
 

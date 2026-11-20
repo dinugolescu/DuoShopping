@@ -39,11 +39,25 @@ adminului, ecranul de bun venit, sfaturile ca fereastră, setările în cont și
 
 ## De făcut
 
-Nimic deocamdată.
+Planificat pentru 2.6 (discutat pe 20 noiembrie 2026):
+
+- Notificare către persoane alese (bife la „Gata, anunță”, implicit toți); mesajul din discuție rămâne vizibil
+  tuturor, cu „către Moni” în text. Funcția `announce` primește `to` opțional.
+- Poză pe rândul produsului (făcută/aleasă de tine, sau luată din linkul lipit; „caută pe site-ul magazinului”
+  ca buton care deschide căutarea, fără API de imagini).
+- Bulină pe listele cu noutăți de la ultima vizită, plus o bulină generală (la fel ca `discutie-lista-vazuta`,
+  stare pe telefon).
+- @ în mesaje, cu alias-uri (@Moni în loc de adresă), ca la primitorii de cadouri.
+- Notificări mai relevante: azi un mesaj nu e „eveniment” (doar added/bought/skipped în `eventsSummary`), deci
+  un comentariu scris pe un produs de cadou pleacă drept „X a modificat lista”. De pus textul mesajului și
+  produsul, iar atingerea să ducă la produsul/mesajul acela.
 
 ## Idei amânate
 
 - Totalul cumpărăturii (suma de pe bon, la „Golește rezolvatele”, cu cheltuieli pe lună și pe magazin).
   Amânat pe 14 noiembrie 2026: lista e încă departe de ce se cumpără de fapt; revenim când seamănă mai mult.
-- Ordinea raioanelor învățată pe fiecare magazin, „Iau eu asta” când sunteți amândoi în magazin,
-  poză direct pe rândul produsului, dată și buget pe lista de cadouri.
+- Dată și buget pe lista de cadouri (buget pe destinatar, preț pe cadou, bara de cheltuit; vizibil doar
+  cumpărătorilor). Păstrat pe 20 noiembrie 2026, probabil 2.7.
+- Ordinea raioanelor învățată pe fiecare magazin (de întrebat toți testerii; împărțirea pe raioane place,
+  ordinea nu deranjează), „Iau eu asta” când sunteți amândoi în magazin, preseturi de destinatari (nu încă).
+- Reamintire cu locația: respinsă.
